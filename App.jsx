@@ -1,52 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Astrion EDGE™ Capture Tool v5.7</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet"/>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<style>
-*{box-sizing:border-box;margin:0;padding:0;}
-html,body{height:100%;overflow:hidden;}
-body{background:#0C0C18;font-family:'DM Sans',sans-serif;color:#E0E0F0;}
-::-webkit-scrollbar{width:5px;height:5px;}
-::-webkit-scrollbar-track{background:#0C0C18;}
-::-webkit-scrollbar-thumb{background:#252545;border-radius:3px;}
-::-webkit-scrollbar-thumb:hover{background:#442C81;}
-input,select,textarea{font-family:'DM Sans',sans-serif;}
-.mono{font-family:'JetBrains Mono',monospace;}
-input[type=range]{accent-color:#442C81;width:100%;cursor:pointer;}
-input[type=checkbox]{accent-color:#FFAF2E;width:15px;height:15px;cursor:pointer;}
-input[type=date]{color-scheme:dark;cursor:pointer;}
-input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.7);cursor:pointer;}
-select option{background:#14142A;color:#E8E8F0;}
-.drop-zone{border:2px dashed #252545;border-radius:10px;padding:22px;text-align:center;cursor:pointer;transition:all .15s;}
-.drop-zone:hover,.drop-zone.drag{border-color:#442C81;background:rgba(68,44,129,.07);}
-@keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
-@keyframes slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-@keyframes toastIn{from{opacity:0;transform:translateX(52px)}to{opacity:1;transform:translateX(0)}}
-@keyframes toastOut{from{opacity:1}to{opacity:0;transform:translateX(52px)}}
-@keyframes spin{to{transform:rotate(360deg)}}
-@keyframes dashFill{from{stroke-dashoffset:283}to{stroke-dashoffset:var(--target)}}
-@keyframes barGrow{from{width:0}to{width:var(--w)}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.18);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;}
-.nav-btn{width:100%;display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:6px;border:none;cursor:pointer;margin-bottom:1px;text-align:left;font-size:11px;transition:all .12s;font-family:'DM Sans',sans-serif;}
-.nav-btn:hover{background:#14143A!important;}
-.card-hover{transition:all .15s;cursor:pointer;}
-.card-hover:hover{background:#1E1E38!important;transform:translateY(-1px);box-shadow:0 6px 24px rgba(0,0,0,.35)!important;}
-</style>
-</head>
-<body>
-<div id="root"></div>
-<script type="text/babel">
-const {useState,useEffect,useRef,useCallback,useMemo}=React;
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { jsPDF as jsPDFLib } from "jspdf";
+
+// Make jsPDF available the same way the original code expects it
+window.jspdf = { jsPDF: jsPDFLib };
+
+
 
 /* ── BRAND ── */
 const B={
@@ -65,29 +23,6 @@ const S={
   tdc:{fontSize:12,color:'#D0D0E8',padding:'7px 10px',borderBottom:`1px solid ${B.border}`,verticalAlign:'top'},
 };
 const ta={...S.inp,minHeight:68,resize:'vertical',lineHeight:1.65};
-
-/* ── BACKEND API LAYER ── */
-const API_BASE=(()=>{try{const u=new URL(window.location.href);return u.searchParams.get('api')||'http://localhost:3001';}catch{return 'http://localhost:3001';}})();
-
-const api={
-  _ok:false,_checking:false,
-  async ping(){
-    try{const r=await fetch(API_BASE+'/api/stats',{signal:AbortSignal.timeout(2000)});this._ok=r.ok;return r.ok;}catch{this._ok=false;return false;}
-  },
-  get ok(){return this._ok;},
-  async get(path){const r=await fetch(API_BASE+path);if(!r.ok)throw new Error(r.statusText);return r.json();},
-  async post(path,body){const r=await fetch(API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error(r.statusText);return r.json();},
-  async put(path,body){const r=await fetch(API_BASE+path,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error(r.statusText);return r.json();},
-  async del(path){const r=await fetch(API_BASE+path,{method:'DELETE'});if(!r.ok)throw new Error(r.statusText);return r.json();},
-  async patch(path,body){const r=await fetch(API_BASE+path,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error(r.statusText);return r.json();},
-  async upload(entityType,entityId,files){
-    const fd=new FormData();
-    Array.from(files).forEach(f=>fd.append('files',f));
-    const r=await fetch(API_BASE+`/api/files/${entityType}/${entityId}`,{method:'POST',body:fd});
-    if(!r.ok)throw new Error(r.statusText);return r.json();
-  },
-  fileUrl(id){return API_BASE+`/api/files/download/${id}`;},
-};
 
 /* ── HELPERS ── */
 const badge=(txt,color,sm)=>(
@@ -158,33 +93,6 @@ const COMP_SIZES=['Large Business','Small Business','SDB','WOSB','SDVOSB','HUBZo
 const CONTRACT_TYPES=['IDIQ/TO','FFP','CPFF','T&M','CPIF','LPTA','BPA','Other'];
 const INTEL_TAGS=['Past Performance','Pricing','Technical','Management','Key Personnel','Teaming','Incumbency','Clearances','Certifications','Agency Relationships'];
 const CPARS=['Exceptional','Very Good','Satisfactory','Marginal','Unsatisfactory'];
-const CONTRACT_VEHICLES=['OASIS+','SEWP V','NITAAC CIO-SP3','NITAAC CIO-CS','STARS III','ALLIANT 2','GSA MAS','CIOSP4','EAGLE II','8(a) STARS III','SBIR/STTR','IDIQ (Agency-Specific)','BPA (Agency-Specific)','Sole Source','Other'];
-const SET_ASIDE_TYPES=['Full & Open','Small Business (SB)','SDVOSB','WOSB/EDWOSB','8(a)','HUBZone','SDB','Partial SB Set-Aside','Multiple Award'];
-const VALUE_RANGES=['<$1M','$1M–$5M','$5M–$25M','$25M–$100M','$100M–$500M','$500M+'];
-const CLASSIFICATION_LEVELS=['Unclassified','CUI','Secret','Top Secret','TS/SCI'];
-const CAPABILITY_KEYWORDS=['C2/SIGINT','ISR','Cyber / CISA','Cloud (AWS/Azure/GCP)','DevSecOps','AI/ML','Systems Engineering','Software Development','Test & Evaluation','Logistics / Supply Chain','Program Management','Training','Data Analytics','Network Operations','IT Service Management','Mission Systems','Weapons Systems','UAS / Counter-UAS','Electronic Warfare','Spectrum Operations','Geospatial / GEOINT','Intelligence Analysis','Acquisition Support','Financial Management','Human Capital','Technical Writing / Proposals'];
-const PP_STRENGTH=['Strong','Moderate','Developing'];
-/* Compute relevance score of a PP record against an opportunity */
-const scorePPRelevance=(pp,opp)=>{
-  if(!opp)return 0;
-  let s=0;
-  const oppN=(opp.naics||'').replace(/\D/g,'').slice(0,6);
-  const ppN=(pp.naics||'').replace(/\D/g,'').slice(0,6);
-  if(oppN&&ppN&&oppN===ppN)s+=40;
-  else if(oppN&&ppN&&oppN.slice(0,4)===ppN.slice(0,4))s+=20;
-  else if(oppN&&ppN&&oppN.slice(0,2)===ppN.slice(0,2))s+=8;
-  const oppAg=(opp.agency||'').toLowerCase();const ppAg=(pp.agency||'').toLowerCase();
-  if(oppAg&&ppAg&&(oppAg.includes(ppAg)||ppAg.includes(oppAg)))s+=25;
-  else if(oppAg&&ppAg){const ow=oppAg.split(/\s+/);const pw=ppAg.split(/\s+/);if(ow.some(w=>w.length>3&&pw.includes(w)))s+=12;}
-  if(pp.contractType&&opp.contractType&&pp.contractType===opp.contractType)s+=10;
-  const oppKw=(opp.description||'').toLowerCase();
-  (pp.keywords||[]).forEach(k=>{if(oppKw.includes(k.toLowerCase().split('/')[0].trim()))s+=5;});
-  if(pp.cparRating==='Exceptional')s+=8;else if(pp.cparRating==='Very Good')s+=4;
-  const endYr=pp.periodEnd?parseInt(pp.periodEnd.slice(0,4)):0;
-  const now=new Date().getFullYear();
-  if(endYr>=now-3)s+=10;else if(endYr>=now-6)s+=5;
-  return Math.min(s,100);
-};
 const DOC_TYPES=[
   {id:'rfi',label:'RFI Response',icon:'🔍',color:B.sky},
   {id:'rfp',label:'Proposal (RFP Response)',icon:'📋',color:B.force},
@@ -194,8 +102,7 @@ const DOC_TYPES=[
   {id:'pastperf',label:'Past Performance Volume',icon:'🏆',color:'#B066FF'},
   {id:'sources',label:'Sources Sought Response',icon:'📡',color:'#66CCFF'},
 ];
-const PP_CATEGORIES=['Cost Savings','Schedule Performance','Quality / Safety','Innovation','Staffing & Retention','Technical Performance','Customer Satisfaction','Risk Reduction','Transition','Process Improvement','Management','Security','Other'];
-const PP_CAT_COLORS={'Cost Savings':'#1ED872','Schedule Performance':'#29AAE1','Quality / Safety':'#FFAF2E','Innovation':'#442C81','Staffing & Retention':'#FC5442','Technical Performance':'#29AAE1','Customer Satisfaction':'#1ED872','Risk Reduction':'#FFAF2E','Transition':'#8888aa','Process Improvement':'#442C81','Management':'#B066FF','Security':'#FF88AA','Other':'#BDBDBD'};
+const PP_CATEGORIES=['Technical','Management','Cost/Pricing','Past Performance','Innovation','Workforce','Security','Cybersecurity','Logistics','C2/SIGINT','ISR','Other'];
 const OPP_DOC_CATEGORIES=['RFP/Solicitation','Amendment','Q&A / Industry Day','SOW / PWS','Market Research / Intel','Solutioning Docs','Pricing / Finance','Past Performance','Proposal Artifacts','Other'];
 
 const makeGates=()=>[
@@ -223,216 +130,12 @@ const blankOpp=o=>({
 });
 
 async function callClaude(system,user){
-  const apiKey=localStorage.getItem('edge_anthropic_key')||'';
-  // Try backend proxy first (avoids CORS issues)
-  try{
-    const br=await fetch('http://localhost:3001/api/ai/generate',{method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({system,user,apiKey})});
-    if(br.ok){const bd=await br.json();if(bd.text)return bd.text;}
-  }catch(e){/* backend not running, try direct */}
-  // Direct API call (works in Claude.ai artifacts or with CORS proxy)
-  if(!apiKey)throw new Error('No API key — configure in Settings → General');
-  const headers={'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':apiKey};
-  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers,
+  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
+    headers:{'Content-Type':'application/json'},
     body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,system,messages:[{role:'user',content:user}]})});
-  if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error?.message||'API error '+r.status);}
   const d=await r.json();
   return d.content?.[0]?.text||'';
 }
-
-
-/* ═══════════════════ IndexedDB STORAGE ENGINE ═══════════════════ */
-const EdgeDB = {
-  DB_NAME: 'AstrionEdge',
-  DB_VERSION: 1,
-  STORE: 'capture_data',
-  _db: null,
-
-  async open() {
-    if (this._db) return this._db;
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open(this.DB_NAME, this.DB_VERSION);
-      req.onupgradeneeded = e => {
-        const db = e.target.result;
-        if (!db.objectStoreNames.contains(this.STORE)) {
-          db.createObjectStore(this.STORE);
-        }
-      };
-      req.onsuccess = e => { this._db = e.target.result; resolve(this._db); };
-      req.onerror = e => { console.warn('[EdgeDB] open failed, falling back to localStorage'); reject(e); };
-    });
-  },
-
-  async get(key) {
-    try {
-      const db = await this.open();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(this.STORE, 'readonly');
-        const req = tx.objectStore(this.STORE).get(key);
-        req.onsuccess = () => resolve(req.result ?? null);
-        req.onerror = () => reject(req.error);
-      });
-    } catch {
-      // Fallback to localStorage
-      try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; }
-    }
-  },
-
-  async set(key, value) {
-    try {
-      const db = await this.open();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(this.STORE, 'readwrite');
-        const req = tx.objectStore(this.STORE).put(value, key);
-        req.onsuccess = () => resolve(true);
-        req.onerror = () => reject(req.error);
-      });
-    } catch {
-      // Fallback to localStorage
-      try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch { return false; }
-    }
-  },
-
-  async remove(key) {
-    try {
-      const db = await this.open();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(this.STORE, 'readwrite');
-        const req = tx.objectStore(this.STORE).delete(key);
-        req.onsuccess = () => resolve(true);
-        req.onerror = () => reject(req.error);
-      });
-    } catch { return false; }
-  },
-
-  // Migrate localStorage → IndexedDB (one-time)
-  async migrateFromLocalStorage() {
-    const keys = ['astrion_opps','astrion_pastperfs','astrion_proofpoints','astrion_files','astrion_gcompetitors','astrion_blackhats'];
-    let migrated = 0;
-    for (const key of keys) {
-      const raw = localStorage.getItem(key);
-      if (raw) {
-        try {
-          const data = JSON.parse(raw);
-          const existing = await this.get(key);
-          if (!existing || (Array.isArray(existing) && existing.length === 0)) {
-            await this.set(key, data);
-            migrated++;
-          }
-        } catch {}
-      }
-    }
-    if (migrated > 0) console.log(`[EdgeDB] Migrated ${migrated} stores from localStorage to IndexedDB`);
-    return migrated;
-  }
-};
-
-/* ═══════════════════ AUTO-TAGGING ENGINE ═══════════════════ */
-const TAG_RULES = {
-  /* Mission / Domain */
-  'counter-uas':['cUAS'],'counter uas':['cUAS'],'cuas':['cUAS'],'counter unmanned':['cUAS'],'suas':['cUAS'],'drone':['cUAS'],
-  'c5isr':['C5ISR'],'c4isr':['C5ISR'],'isr':['C5ISR'],'sigint':['C5ISR'],'c2':['C5ISR'],'comms':['C5ISR'],'communications':['C5ISR'],
-  'space':['Space & Missile Defense'],'missile defense':['Space & Missile Defense'],'smdc':['Space & Missile Defense','SMDC'],'mda':['Space & Missile Defense','MDA'],'satellite':['Space & Missile Defense'],
-  'cyber':['Cyber / Cybersecurity'],'cybersecurity':['Cyber / Cybersecurity'],'devsecops':['Cyber / Cybersecurity','Software Engineering'],'cloud':['Cyber / Cybersecurity'],
-  'artificial intelligence':['AI/ML / Autonomy'],'machine learning':['AI/ML / Autonomy'],'autonomy':['AI/ML / Autonomy'],'autonomous':['AI/ML / Autonomy'],'ai/ml':['AI/ML / Autonomy'],' ai ':['AI/ML / Autonomy'],
-  'electronic warfare':['Electronic Warfare'],' ew ':['Electronic Warfare'],'ewir':['Electronic Warfare'],'spectrum':['Electronic Warfare'],
-  'directed energy':['Directed Energy'],'laser':['Directed Energy'],'hel ':['Directed Energy'],'high energy':['Directed Energy'],
-  'aviation':['Aviation / Flight Ops'],'flight operations':['Aviation / Flight Ops'],'flight test':['Aviation / Flight Ops','T&E'],'aircraft':['Aviation / Flight Ops'],'rotary':['Aviation / Flight Ops'],'uas':['Aviation / Flight Ops'],
-  'hypersonic':['Hypersonics'],'glide vehicle':['Hypersonics'],
-  'nuclear':['Nuclear & Strategic Deterrence'],'strategic deterrence':['Nuclear & Strategic Deterrence'],'icbm':['Nuclear & Strategic Deterrence'],
-  /* Service / Work Type */
-  'seta':['SETA'],'systems engineering':['SETA'],'technical assistance':['SETA'],'advisory':['SETA'],
-  't&e':['T&E'],'test and evaluation':['T&E'],'testing':['T&E'],'developmental test':['T&E'],'operational test':['T&E'],'live fire':['T&E'],
-  'training support':['Training'],'training development':['Training'],'instructor':['Training'],'course':['Training'],'curriculum':['Training'],
-  'operations and maintenance':['O&M'],'o&m':['O&M'],'sustainment':['O&M','Logistics / Sustainment'],
-  'r&d':['R&D / S&T'],'research and development':['R&D / S&T'],'science and technology':['R&D / S&T'],'s&t':['R&D / S&T'],'sbir':['R&D / S&T'],
-  'program management':['Program Management'],'pmo':['Program Management'],'pmp':['Program Management'],
-  'acquisition':['Acquisition Support'],'contracting officer':['Acquisition Support'],
-  'logistics':['Logistics / Sustainment'],'supply chain':['Logistics / Sustainment'],
-  'data management':['Data Analytics'],'analytics':['Data Analytics'],'data science':['Data Analytics'],'dashboard':['Data Analytics'],
-  'range':['Range Operations'],'range operations':['Range Operations'],'instrumentation':['Range Operations'],
-  'modeling and simulation':['M&S'],'m&s':['M&S'],'simulation':['M&S'],'digital twin':['M&S'],
-  'systems integration':['Systems Integration'],'integration':['Systems Integration'],
-  'software development':['Software Engineering'],'software engineering':['Software Engineering'],'agile':['Software Engineering'],
-  /* Differentiator */
-  'cost sav':['Cost Savings'],'under budget':['Cost Savings'],'cost reduction':['Cost Savings'],'cost avoidance':['Cost Savings'],
-  'ahead of schedule':['Schedule Performance'],'on schedule':['Schedule Performance'],'early delivery':['Schedule Performance'],
-  'zero incident':['Quality / Safety'],'zero defect':['Quality / Safety'],'safety':['Quality / Safety'],'iso 9001':['Quality / Safety'],'cmmi':['Quality / Safety'],
-  'innovat':['Innovation'],'patent':['Innovation'],'novel':['Innovation'],
-  'transition':['Transition / Surge'],'surge':['Transition / Surge'],'ramp up':['Transition / Surge'],'scalab':['Transition / Surge'],
-  'incumbent':['Incumbent Advantage'],'recompete':['Incumbent Advantage'],
-  'small business':['Small Business'],'mentor.protege':['Small Business'],'subcontract':['Small Business'],
-  'clearance':['Cleared Workforce'],'secret':['Cleared Workforce'],'top secret':['Cleared Workforce'],'ts/sci':['Cleared Workforce'],'classified':['Cleared Workforce'],
-  'cpars':['Customer Satisfaction'],'award fee':['Customer Satisfaction'],'excellent rating':['Customer Satisfaction'],'exceptional':['Customer Satisfaction'],
-  /* Customer / Agency */
-  'army':['Army'],'peo aviation':['Army','PEO Aviation'],'peo avn':['Army','PEO Aviation'],'amcom':['Army'],
-  'navy':['Navy'],'navsea':['Navy'],'navair':['Navy'],'usmc':['Navy'],
-  'air force':['Air Force'],'usaf':['Air Force'],'aetc':['Air Force'],'aflcmc':['Air Force'],
-  'space force':['Space Force'],'ussf':['Space Force'],'ssc':['Space Force'],
-  'dtra':['DTRA'],'defense threat':['DTRA'],
-  'devcom':['DEVCOM'],'rdecom':['DEVCOM'],'ccdc':['DEVCOM'],
-  'nasa':['NASA'],
-  'dhs':['DHS / CBP'],'customs and border':['DHS / CBP'],'cbp':['DHS / CBP'],
-  'intelligence community':['Intelligence Community'],'nsa':['Intelligence Community'],'dia':['Intelligence Community'],'nro':['Intelligence Community'],
-};
-
-const NAICS_KEYWORDS = {
-  '541330':['Engineering Services'],'541511':['Custom Computer Programming'],
-  '541512':['Computer Systems Design'],'541513':['Computer Facilities Management'],
-  '541519':['Other Computer Related Services'],'541611':['Administrative Management Consulting'],
-  '541614':['Process & Logistics Consulting'],'541690':['Other Scientific & Technical Consulting'],
-  '541715':['R&D Physical Engineering & Life Sciences'],'541990':['Other Professional Services'],
-  '561210':['Facilities Support Services'],'561320':['Temporary Staffing Services'],
-  '611430':['Professional Development Training'],'561110':['Office Administrative Services'],
-};
-
-function autoTagPastPerf(pp) {
-  const autoEnabled=(() => { try { return JSON.parse(localStorage.getItem('edge_autotag_enabled') || 'true'); } catch { return true; } })();
-  if(!autoEnabled) return { suggestedTags: [], suggestedKeywords: [] };
-  const suggestedTags = new Set();
-  const suggestedKeywords = new Set();
-  const text = [pp.name, pp.description, pp.scope, pp.keyAchievements, pp.relevance, pp.contractVehicle, pp.agency].filter(Boolean).join(' ').toLowerCase();
-
-  // Custom rules first (take priority)
-  const customRules=(() => { try { return JSON.parse(localStorage.getItem('edge_custom_tag_rules') || '{}'); } catch { return {}; } })();
-  for (const [pattern, tags] of Object.entries(customRules)) {
-    if (text.includes(pattern)) tags.forEach(t => suggestedTags.add(t));
-  }
-
-  for (const [pattern, tags] of Object.entries(TAG_RULES)) {
-    if (text.includes(pattern)) tags.forEach(t => suggestedTags.add(t));
-  }
-
-  const naics = (pp.naics || '').trim();
-  if (naics && NAICS_KEYWORDS[naics]) NAICS_KEYWORDS[naics].forEach(kw => suggestedKeywords.add(kw));
-
-  if (pp.role === 'Prime') suggestedTags.add('Incumbent Advantage');
-  if (pp.role === 'Sub') suggestedTags.add('Small Business');
-
-  // Classification-based
-  if (pp.classification && pp.classification !== 'Unclassified') suggestedTags.add('Cleared Workforce');
-
-  return { suggestedTags: [...suggestedTags], suggestedKeywords: [...suggestedKeywords] };
-}
-
-function categorizeFile(filename) {
-  const lower = (filename || '').toLowerCase();
-  if (/rfp|solicitation|synopsis|presol/.test(lower)) return 'RFP/Solicitation';
-  if (/amend|mod\d|modification/.test(lower)) return 'Amendment';
-  if (/q\s*&\s*a|industry.?day|qa/.test(lower)) return 'Q&A / Industry Day';
-  if (/sow|pws|statement.?of.?work|perf.?work/.test(lower)) return 'SOW / PWS';
-  if (/intel|market.?research|competitive|landscape/.test(lower)) return 'Market Research / Intel';
-  if (/solution|technical.?approach|architecture/.test(lower)) return 'Solutioning Docs';
-  if (/price|cost|pric|basis.?of.?estimate|boe|boa/.test(lower)) return 'Pricing / Finance';
-  if (/past.?perf|cpars|pp.?narrative|pp.?volume/.test(lower)) return 'Past Performance';
-  if (/proposal|vol|section|draft|final/.test(lower)) return 'Proposal Artifacts';
-  if (/resume|cv|key.?personnel/.test(lower)) return 'Key Personnel';
-  if (/org.?chart|staffing|wbs/.test(lower)) return 'Management';
-  if (/nda|teaming|mou|ata|subcontract/.test(lower)) return 'Teaming';
-  return 'Other';
-}
-
 
 /* ── EXPORT UTILITIES ── */
 function exportToPDF(text,title,subtitle,footerNote){
@@ -470,16 +173,8 @@ function exportToDoc(text,title,subtitle){
 }
 
 /* ── INTEL TAGS SYSTEM ── */
-/* ── TIERED TAG TAXONOMY ── */
-const TAG_TIERS={
-  'Mission / Domain':{color:'#FF6699',tags:['cUAS','C5ISR','Space & Missile Defense','Cyber / Cybersecurity','AI/ML / Autonomy','Electronic Warfare','Directed Energy','Aviation / Flight Ops','Hypersonics','Nuclear & Strategic Deterrence']},
-  'Service / Work Type':{color:'#6699FF',tags:['SETA','T&E','Training','O&M','R&D / S&T','Program Management','Acquisition Support','Logistics / Sustainment','Data Analytics','Range Operations','M&S','Systems Integration','Software Engineering']},
-  'Differentiator':{color:'#66FFAA',tags:['Cost Savings','Schedule Performance','Quality / Safety','Innovation','Transition / Surge','Incumbent Advantage','Small Business','Cleared Workforce','Customer Satisfaction']},
-  'Customer / Agency':{color:'#FFAA66',tags:['Army','Navy','Air Force','Space Force','MDA','DTRA','SMDC','PEO Aviation','PEO M&S','DEVCOM','NASA','DHS / CBP','Intelligence Community']},
-};
-const ALL_TAGS=Object.values(TAG_TIERS).flatMap(t=>t.tags);
-const tagTierOf=t=>{for(const[tier,v]of Object.entries(TAG_TIERS)){if(v.tags.includes(t))return{tier,color:v.color};}return{tier:'Other',color:B.silver};};
-const tagColor=t=>tagTierOf(t).color;
+const ALL_TAGS=['Past Performance','Pricing','Technical','Management','Key Personnel','Teaming','Incumbency','Clearances','Certifications','Agency Relationships','SIGINT','ISR','C2','Cyber','Cloud','DevSecOps'];
+const tagColor=t=>{const m={'Past Performance':'#B066FF',Pricing:B.supernova,Technical:B.sky,Management:B.force,'Key Personnel':'#FF88AA',Teaming:B.refraction,Incumbency:'#66CCFF',Clearances:'#88FFCC',Certifications:'#FFDD66',SIGINT:B.twilight,ISR:'#FF9966',C2:'#66FF99',Cyber:'#FF6699',Cloud:'#6699FF',DevSecOps:'#99FF66','Agency Relationships':'#CC99FF'};return m[t]||B.silver;};
 
 function TagEditor({tags,onChange,compact}){
   const [open,setOpen]=useState(false);
@@ -490,17 +185,8 @@ function TagEditor({tags,onChange,compact}){
       {cur.map(t=><span key={t} onClick={()=>toggle(t)} style={{cursor:'pointer'}}>{badge(t,tagColor(t),true)} <span style={{fontSize:8,color:B.twilight}}>✕</span></span>)}
       <button onClick={()=>setOpen(!open)} style={{...S.btn('transparent'),border:`1px dashed ${B.border}`,color:B.silver,fontSize:10,padding:'2px 8px'}}>{open?'Close':'+ Tag'}</button>
     </div>
-    {open&&<div style={{marginTop:6,background:'#12122A',border:`1px solid ${B.border}`,borderRadius:10,padding:10,maxHeight:260,overflowY:'auto',animation:'fadeIn .12s ease'}}>
-      {Object.entries(TAG_TIERS).map(([tier,{color,tags:tierTags}])=>{
-        const avail=tierTags.filter(t=>!cur.includes(t));
-        if(!avail.length)return null;
-        return <div key={tier} style={{marginBottom:8}}>
-          <div style={{fontSize:9,fontWeight:700,color,letterSpacing:'.08em',textTransform:'uppercase',marginBottom:4,borderBottom:`1px solid ${color}33`,paddingBottom:2}}>{tier}</div>
-          <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
-            {avail.map(t=><span key={t} onClick={()=>toggle(t)} style={{cursor:'pointer'}}>{badge(t,color,true)}</span>)}
-          </div>
-        </div>;
-      })}
+    {open&&<div style={{display:'flex',gap:4,flexWrap:'wrap',marginTop:6,padding:8,background:'#181830',borderRadius:8,border:`1px solid ${B.border}`,animation:'fadeIn .12s ease'}}>
+      {ALL_TAGS.filter(t=>!cur.includes(t)).map(t=><span key={t} onClick={()=>toggle(t)} style={{cursor:'pointer'}}>{badge(t,tagColor(t),true)}</span>)}
       {ALL_TAGS.filter(t=>!cur.includes(t)).length===0&&<span style={{fontSize:11,color:B.silver}}>All tags applied</span>}
     </div>}
   </div>;
@@ -568,10 +254,7 @@ function FileUploader({onUpload,compact,maxMB=10}){
 function FileList({fileIds,fileStore,onRemove,onAdd,compact}){
   const files=(fileIds||[]).map(id=>fileStore[id]).filter(Boolean);
   const [preview,setPreview]=useState(null);
-  const dl=f=>{
-    if(api.ok&&f.backendId){window.open(api.fileUrl(f.backendId),'_blank');return;}
-    if(f.data){const a=document.createElement('a');a.href=f.data;a.download=f.name;a.click();}
-  };
+  const dl=f=>{const a=document.createElement('a');a.href=f.data;a.download=f.name;a.click();};
   return <div>
     {onAdd&&<FileUploader compact={compact} onUpload={(f)=>{if(f)onAdd(f);}}/>}
     {files.length>0&&<div style={{marginTop:8,display:'flex',flexDirection:'column',gap:4}}>
@@ -587,7 +270,7 @@ function FileList({fileIds,fileStore,onRemove,onAdd,compact}){
       </div>)}
     </div>}
     {preview&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.9)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:2000}} onClick={()=>setPreview(null)}>
-      <img src={preview.backendId&&api.ok?api.fileUrl(preview.backendId):preview.data} alt={preview.name} style={{maxWidth:'90vw',maxHeight:'90vh',borderRadius:10,boxShadow:'0 24px 80px rgba(0,0,0,.9)'}}/>
+      <img src={preview.data} alt={preview.name} style={{maxWidth:'90vw',maxHeight:'90vh',borderRadius:10,boxShadow:'0 24px 80px rgba(0,0,0,.9)'}}/>
     </div>}
   </div>;
 }
@@ -689,31 +372,11 @@ function ProofPointPicker({proofPoints,selectedIds,onToggle,label='Link Proof Po
 }
 
 /* ── PAST PERF PICKER ── */
-function PastPerfPicker({pastPerfs,selectedIds,onToggle,label='Link Past Performances',opp=null}){
+function PastPerfPicker({pastPerfs,selectedIds,onToggle,label='Link Past Performances'}){
   const [open,setOpen]=useState(false);
   const [q,setQ]=useState('');
-  const [sortBy,setSortBy]=useState(opp?'relevance':'alpha');
+  const filtered=pastPerfs.filter(p=>!q||(p.name+p.agency).toLowerCase().includes(q.toLowerCase()));
   const sel=selectedIds||[];
-  const scored=useMemo(()=>pastPerfs.map(p=>({...p,_score:opp?scorePPRelevance(p,opp):0})),[pastPerfs,opp]);
-  const filtered=scored.filter(p=>!q||(p.name+p.agency+p.contractNumber+(p.keywords||[]).join(' ')).toLowerCase().includes(q.toLowerCase()));
-  const sorted=[...filtered].sort((a,b)=>sortBy==='relevance'?(b._score-a._score)||(a.name.localeCompare(b.name)):a.name.localeCompare(b.name));
-  const suggested=opp?sorted.filter(p=>!sel.includes(p.id)&&p._score>=25).slice(0,5):[];
-  const scoreColor=s=>s>=60?B.refraction:s>=30?B.supernova:B.silver;
-  const ScoreBar=({score})=><div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
-    <div style={{width:32,height:4,borderRadius:2,background:B.border,overflow:'hidden'}}><div style={{width:`${score}%`,height:'100%',background:scoreColor(score),transition:'width .3s'}}/></div>
-    <span style={{fontSize:9,color:scoreColor(score),fontWeight:700,minWidth:22}}>{score}%</span>
-  </div>;
-  const PPRow=({p,showScore})=>{const on=sel.includes(p.id);return<div onClick={()=>onToggle(p.id)} style={{display:'flex',gap:8,alignItems:'center',padding:'8px 10px',borderRadius:7,cursor:'pointer',background:on?'#B066FF18':'transparent',border:`1px solid ${on?'#B066FF44':B.border}`,transition:'all .1s',marginBottom:2}}>
-    <div style={{width:15,height:15,borderRadius:3,border:`2px solid ${on?'#B066FF':B.border}`,background:on?'#B066FF':'transparent',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:'#fff'}}>{on?'✓':''}</div>
-    <div style={{flex:1,minWidth:0}}>
-      <div style={{fontSize:11,fontWeight:600,color:'#E0E0F0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div>
-      <div style={{fontSize:10,color:B.silver,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.agency||'—'} · {p.value||'—'} · {p.role}</div>
-    </div>
-    <div style={{display:'flex',gap:4,alignItems:'center',flexShrink:0}}>
-      {p.cparRating&&badge(p.cparRating,cparsColor(p.cparRating),true)}
-      {showScore&&opp&&<ScoreBar score={p._score}/>}
-    </div>
-  </div>;};
   return <div>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
       <span style={S.lbl}>{label}</span>
@@ -723,19 +386,17 @@ function PastPerfPicker({pastPerfs,selectedIds,onToggle,label='Link Past Perform
       {sel.map(id=>{const p=pastPerfs.find(x=>x.id===id);return p?<span key={id} style={{cursor:'pointer'}} onClick={()=>onToggle(id)}>{badge(p.name.slice(0,26)+(p.name.length>26?'…':''),'#B066FF',true)} <span style={{fontSize:9,color:B.twilight}}>✕</span></span>:null;})}
     </div>}
     {open&&<div style={{background:'#181830',border:`1px solid ${B.border}`,borderRadius:9,padding:10,marginBottom:8,animation:'fadeIn .15s ease'}}>
-      <div style={{display:'flex',gap:6,marginBottom:8}}>
-        <div style={{position:'relative',flex:1}}><span style={{position:'absolute',left:7,top:'50%',transform:'translateY(-50%)',fontSize:11,color:B.silver}}>🔍</span><input style={{...S.inp,fontSize:11,paddingLeft:24}} placeholder="Search by name, agency, keyword…" value={q} onChange={e=>setQ(e.target.value)}/></div>
-        {opp&&<select style={{...S.inp,width:'auto',fontSize:11,padding:'4px 8px'}} value={sortBy} onChange={e=>setSortBy(e.target.value)}><option value="relevance">By Relevance</option><option value="alpha">A–Z</option></select>}
-      </div>
-      {opp&&suggested.length>0&&!q&&<div style={{marginBottom:8}}>
-        <div style={{fontSize:9,fontWeight:700,color:B.refraction,letterSpacing:1,marginBottom:5,textTransform:'uppercase'}}>⚡ Smart Match — Top {suggested.length} for this Opportunity</div>
-        {suggested.map(p=><PPRow key={p.id} p={p} showScore={true}/>)}
-        <div style={{borderTop:`1px solid ${B.border}`,margin:'8px 0'}}/>
-        <div style={{fontSize:9,fontWeight:700,color:B.silver,letterSpacing:1,marginBottom:5,textTransform:'uppercase'}}>All Records</div>
-      </div>}
-      <div style={{maxHeight:200,overflowY:'auto',display:'flex',flexDirection:'column'}}>
-        {sorted.length===0&&<div style={{color:B.silver,fontSize:12,textAlign:'center',padding:14}}>No past performances found.</div>}
-        {sorted.filter(p=>!opp||q||(suggested.findIndex(s=>s.id===p.id)===-1)).map(p=><PPRow key={p.id} p={p} showScore={true}/>)}
+      <input style={{...S.inp,marginBottom:8,fontSize:11}} placeholder="Search past performances…" value={q} onChange={e=>setQ(e.target.value)}/>
+      <div style={{maxHeight:180,overflowY:'auto',display:'flex',flexDirection:'column',gap:3}}>
+        {filtered.length===0&&<div style={{color:B.silver,fontSize:12,textAlign:'center',padding:14}}>No past performances yet.</div>}
+        {filtered.map(p=>{const on=sel.includes(p.id);return <div key={p.id} onClick={()=>onToggle(p.id)} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',borderRadius:7,cursor:'pointer',background:on?'#B066FF22':'transparent',border:`1px solid ${on?'#B066FF':B.border}`,transition:'all .1s'}}>
+          <div style={{width:14,height:14,borderRadius:3,border:`2px solid ${on?'#B066FF':B.border}`,background:on?'#B066FF':'transparent',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:'#fff'}}>{on?'✓':''}</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:11,fontWeight:600,color:'#E0E0F0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div>
+            <div style={{fontSize:10,color:B.silver}}>{p.agency} · {p.value} · {p.role}</div>
+          </div>
+          {p.cparRating&&badge(p.cparRating,cparsColor(p.cparRating),true)}
+        </div>;})}
       </div>
     </div>}
   </div>;
@@ -931,43 +592,24 @@ function OppDocuments({opp,onChange,toast}){
   const totalSize=files.reduce((a,f)=>a+f.size,0);
   const usedCats=[...new Set(files.map(f=>f.category))];
 
-  const process=rawFiles=>Array.from(rawFiles).forEach(async(file)=>{
+  const process=rawFiles=>Array.from(rawFiles).forEach(file=>{
     if(file.size>MAX){toast(`${file.name} exceeds 10MB`,'warn');return;}
-    if(api.ok){
-      try{
-        const res=await api.upload('opp',opp.id,[file]);
-        const uploaded=(res||[]).map(f=>({id:f.id,name:f.name,type:f.type,size:f.size,backendId:f.id,uploadedAt:f.created_at||new Date().toISOString(),category:f.category||categorizeFile(f.name),notes:f.notes||''}));
-        onChange({...opp,oppFiles:[...(opp.oppFiles||[]),...uploaded]});
-        toast(`${file.name} uploaded`);
-      }catch(e){toast(`Upload failed: ${e.message}`,'error');}
-    }else{
-      const r=new FileReader();
-      r.onload=e=>{
-        const nf={id:Date.now()+Math.random(),name:file.name,type:file.type,size:file.size,data:e.target.result,uploadedAt:new Date().toISOString(),category:categorizeFile(file.name),notes:''};
-        onChange({...opp,oppFiles:[...(opp.oppFiles||[]),nf]});
-        toast(`${file.name} uploaded`);
-      };
-      r.readAsDataURL(file);
-    }
+    const r=new FileReader();
+    r.onload=e=>{
+      const nf={id:Date.now()+Math.random(),name:file.name,type:file.type,size:file.size,data:e.target.result,uploadedAt:new Date().toISOString(),category:'Other',notes:''};
+      onChange({...opp,oppFiles:[...(opp.oppFiles||[]),nf]});
+      toast(`${file.name} uploaded`);
+    };
+    r.readAsDataURL(file);
   });
   const onDrop=e=>{e.preventDefault();setDrag(false);process(e.dataTransfer.files);};
-  const updFile=(id,field,val)=>{
-    onChange({...opp,oppFiles:files.map(f=>f.id===id?{...f,[field]:val}:f)});
-    if(api.ok&&(field==='category'||field==='notes'))api.patch('/api/files/'+id,{[field]:val}).catch(()=>{});
-  };
-  const delFile=id=>{
-    onChange({...opp,oppFiles:files.filter(f=>f.id!==id)});
-    if(api.ok)api.del('/api/files/'+id).catch(()=>{});
-    toast('File removed');
-  };
-  const dl=f=>{
-    if(api.ok&&f.backendId){window.open(api.fileUrl(f.backendId),'_blank');return;}
-    if(f.data){const a=document.createElement('a');a.href=f.data;a.download=f.name;a.click();}
-  };
+  const updFile=(id,field,val)=>onChange({...opp,oppFiles:files.map(f=>f.id===id?{...f,[field]:val}:f)});
+  const delFile=id=>{onChange({...opp,oppFiles:files.filter(f=>f.id!==id)});toast('File removed');};
+  const dl=f=>{const a=document.createElement('a');a.href=f.data;a.download=f.name;a.click();};
 
   return <div>
     {preview&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.92)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:2000}} onClick={()=>setPreview(null)}>
-      <img src={preview.backendId&&api.ok?api.fileUrl(preview.backendId):preview.data} alt={preview.name} style={{maxWidth:'90vw',maxHeight:'90vh',borderRadius:10,boxShadow:'0 24px 80px rgba(0,0,0,.9)'}}/>
+      <img src={preview.data} alt={preview.name} style={{maxWidth:'90vw',maxHeight:'90vh',borderRadius:10,boxShadow:'0 24px 80px rgba(0,0,0,.9)'}}/>
     </div>}
 
     {/* Stats bar */}
@@ -1241,15 +883,6 @@ function BlackHatCenter({blackHatSessions,setBlackHatSessions,globalCompetitors,
       const newWk=entry.weaknesses?(c.weaknesses?c.weaknesses+'\n• '+entry.weaknesses:'• '+entry.weaknesses):c.weaknesses;
       return {...c,strengths:newStr||c.strengths,weaknesses:newWk||c.weaknesses};
     }));
-    if(api.ok){
-      const session=blackHatSessions.find(x=>x.id===sel);
-      api.post('/api/competitors/sync/push-to-global',{
-        competitorId:gcId, oppId:session?.oppId||null, sessionId:sel,
-        strengths:entry.strengths||'', weaknesses:entry.weaknesses||'',
-        ghosting:entry.ghosting||[],
-        source:session?`Black Hat — ${session.title||'Session'}`:''
-      }).catch(()=>{});
-    }
     toast('Intel pushed to competitor profile');
   };
   const syncOppCompetitors=sessionId=>{
@@ -1266,7 +899,6 @@ function BlackHatCenter({blackHatSessions,setBlackHatSessions,globalCompetitors,
         const existing=newComps.find(c=>c.globalCompId===e.globalCompId);
         if(!existing){
           newComps.push({id:Date.now()+Math.random(),name:gc.name,globalCompId:e.globalCompId,threat:e.threat,role:e.role,info:e.notes,teammates:'',strengths:e.strengths,weaknesses:e.weaknesses,ghosting:e.ghosting||[]});
-          if(api.ok)api.post('/api/competitors/sync/push-to-opp',{competitorId:e.globalCompId,oppId:oid,threat:e.threat||'Medium',role:e.role||'Prime'}).catch(()=>{});
         }
       });
       return {...o,blackHatSessionIds:[...(o.blackHatSessionIds||[]),sessionId],competitors:newComps};
@@ -1434,7 +1066,6 @@ function CompetitiveIntel({opp,onChange,globalCompetitors,blackHatSessions,toast
     const gc=globalCompetitors.find(c=>c.id===gcId);if(!gc)return;
     const id=Date.now();
     onChange({...opp,competitors:[...cs,{id,name:gc.name,threat:'Medium',role:'Prime',globalCompId:gcId,info:gc.overview||'',teammates:gc.typicalPartners||'',strengths:gc.strengths||'',weaknesses:gc.weaknesses||'',ghosting:[{them:'',us:''}]}]});
-    if(api.ok)api.post('/api/competitors/sync/push-to-opp',{competitorId:gcId,oppId:opp.id,threat:'Medium',role:'Prime'}).catch(()=>{});
     setExp(id);
   };
   const upd=(id,f,v)=>onChange({...opp,competitors:cs.map(c=>c.id===id?{...c,[f]:v}:c)});
@@ -1789,7 +1420,7 @@ function GateBriefing({opp,pastPerfs,toast}){
     setLoading(false);
   };
   const gc=GC[sel];
-  const printBrief=()=>{const w=window.open('','_blank','width=800,height=600');w.document.write(`<html><head><title>${gc.label}</title><style>body{font-family:'DM Sans',Verdana,sans-serif;padding:40px;color:#222}h1{color:#442C81;border-bottom:2px solid #29AAE1;padding-bottom:8px}pre{white-space:pre-wrap;font-size:13px;line-height:1.85}footer{margin-top:32px;padding-top:12px;border-top:1px solid #ccc;font-size:11px;color:#666}</style></head><body><h1>${gc.label} — Executive Brief</h1><h2>${opp.name||'Untitled'} · ${opp.tcv||'TBD'} · ${opp.agency||'TBD'}</h2><pre>${content[sel]}</pre><div style="margin-top:20px;padding:12px;background:#f5f5f5;border-left:4px solid #442C81"><strong>Ask:</strong> ${ask||gc.defaultAsk}</div><footer>Astrion EDGE™ Capture v5.7 · ${new Date().toLocaleDateString()}</footer></body></html>`);w.document.close();setTimeout(()=>w.print(),500);};
+  const printBrief=()=>{const w=window.open('','_blank','width=800,height=600');w.document.write(`<html><head><title>${gc.label}</title><style>body{font-family:'DM Sans',Verdana,sans-serif;padding:40px;color:#222}h1{color:#442C81;border-bottom:2px solid #29AAE1;padding-bottom:8px}pre{white-space:pre-wrap;font-size:13px;line-height:1.85}footer{margin-top:32px;padding-top:12px;border-top:1px solid #ccc;font-size:11px;color:#666}</style></head><body><h1>${gc.label} — Executive Brief</h1><h2>${opp.name||'Untitled'} · ${opp.tcv||'TBD'} · ${opp.agency||'TBD'}</h2><pre>${content[sel]}</pre><div style="margin-top:20px;padding:12px;background:#f5f5f5;border-left:4px solid #442C81"><strong>Ask:</strong> ${ask||gc.defaultAsk}</div><footer>Astrion EDGE™ Capture v5.1 · ${new Date().toLocaleDateString()}</footer></body></html>`);w.document.close();setTimeout(()=>w.print(),500);};
   return <div>
     <div style={{display:'flex',gap:10,marginBottom:14}}>{Object.entries(GC).map(([gid,gc2])=><button key={gid} style={{flex:1,padding:'10px',borderRadius:9,border:`2px solid ${sel===gid?gc2.color:B.border}`,background:sel===gid?gc2.color+'22':B.cardBg,color:sel===gid?gc2.color:'#9090B8',fontWeight:700,fontSize:12,cursor:'pointer',transition:'all .15s',fontFamily:"'DM Sans',sans-serif"}} onClick={()=>setSel(gid)}>{gc2.label}</button>)}</div>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
@@ -1829,96 +1460,44 @@ function GateBriefing({opp,pastPerfs,toast}){
 /* ═══════════════════ OPP PAST PERF (linked) ═══════════════════ */
 function OppPastPerf({opp,onChange,pastPerfs,proofPoints}){
   const linked=pastPerfs.filter(p=>(opp.linkedPastPerfIds||[]).includes(p.id));
-  const [showGap,setShowGap]=useState(false);
-  const toggle=id=>{
-    const isLinked=(opp.linkedPastPerfIds||[]).includes(id);
-    onChange({...opp,linkedPastPerfIds:isLinked?(opp.linkedPastPerfIds||[]).filter(x=>x!==id):[...(opp.linkedPastPerfIds||[]),id]});
-  };
-  /* Gap analysis — check what capability keywords linked PPs cover */
-  const coveredKw=new Set(linked.flatMap(p=>p.keywords||[]));
-  const oppDesc=(opp.description||'').toLowerCase();
-  const relevantKw=CAPABILITY_KEYWORDS.filter(k=>oppDesc.includes(k.toLowerCase().split('/')[0].trim())||oppDesc.includes((k.split(' ')[0]||'').toLowerCase()));
-  const gaps=relevantKw.filter(k=>!coveredKw.has(k));
-  const scoreC=s=>s>=60?B.refraction:s>=30?B.supernova:'#B066FF';
+  const toggle=id=>onChange({...opp,linkedPastPerfIds:(opp.linkedPastPerfIds||[]).includes(id)?(opp.linkedPastPerfIds||[]).filter(x=>x!==id):[...(opp.linkedPastPerfIds||[]),id]});
   return <div>
-    {/* Smart Match Banner */}
-    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:14}}>
-      {[
-        {l:'Linked',v:linked.length,c:'#B066FF',icon:'🏆'},
-        {l:'Avg Relevance',v:linked.length?Math.round(linked.reduce((s,p)=>s+scorePPRelevance(p,opp),0)/linked.length)+'%':'—',c:B.sky,icon:'🎯'},
-        {l:'Coverage Gaps',v:gaps.length,c:gaps.length>2?B.twilight:gaps.length>0?B.supernova:B.refraction,icon:'⚠️'},
-      ].map(({l,v,c,icon})=><div key={l} style={{...S.card,marginBottom:0,textAlign:'center',borderColor:c+'44',padding:'12px 8px'}}>
-        <div style={{fontSize:11,marginBottom:3}}>{icon}</div>
-        <div className="mono" style={{fontSize:20,fontWeight:700,color:c}}>{v}</div>
-        <div style={{...S.lbl,textAlign:'center',marginTop:2}}>{l}</div>
-      </div>)}
+    <div style={{...S.card,border:`1px solid ${'#B066FF'}44`,marginBottom:16}}>
+      <div style={{fontSize:13,color:'#B066FF',fontWeight:600,marginBottom:4}}>🏆 Link Past Performance Records</div>
+      <div style={{fontSize:12,color:B.silver,lineHeight:1.7}}>Link records from the global Past Performance Library. Linked records will be available in Gate Briefings and Document Generator.</div>
     </div>
-    {/* Gap Analysis */}
-    {gaps.length>0&&<div style={{...S.card,border:`1px solid ${B.supernova}33`,marginBottom:12}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:showGap?10:0}}>
-        <div style={{fontSize:12,fontWeight:700,color:B.supernova}}>⚠️ Coverage Gaps Detected</div>
-        <button onClick={()=>setShowGap(!showGap)} style={{...S.btn('transparent'),border:`1px solid ${B.border}`,fontSize:10,color:B.silver,padding:'3px 8px'}}>{showGap?'Hide':'View Gaps'}</button>
-      </div>
-      {showGap&&<div>
-        <div style={{fontSize:11,color:B.silver,marginBottom:8}}>Based on the opportunity description, these capability areas appear relevant but aren't covered by your linked PPs:</div>
-        <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-          {gaps.map(k=><span key={k} style={{padding:'3px 10px',borderRadius:20,background:B.supernova+'18',color:B.supernova,fontSize:10,border:`1px solid ${B.supernova}33`}}>{k}</span>)}
-        </div>
-      </div>}
-    </div>}
-    {/* Smart Picker */}
-    <div style={{...S.card,border:`1px solid ${'#B066FF'}33`,marginBottom:12}}>
-      <div style={{fontSize:12,color:'#B066FF',fontWeight:700,marginBottom:2}}>🏆 Link Past Performance Records</div>
-      <div style={{fontSize:11,color:B.silver,marginBottom:10,lineHeight:1.6}}>Records are ranked by relevance to this opportunity's NAICS, agency, and description. Linked records feed Gate Briefings and the Document Generator.</div>
-      <PastPerfPicker pastPerfs={pastPerfs} selectedIds={opp.linkedPastPerfIds||[]} onToggle={toggle} label={`Past Performances (${linked.length} linked)`} opp={opp}/>
-    </div>
-    {linked.length===0&&<div style={{...S.card,textAlign:'center',color:B.silver,padding:32,fontSize:12}}>No records linked yet. Use the picker above — smart match will surface the most relevant records first.</div>}
-    {linked.map(pp=>{const score=scorePPRelevance(pp,opp);return<div key={pp.id} style={{...S.card,borderLeft:`3px solid ${scoreC(score)}`,marginBottom:8,animation:'fadeIn .2s ease'}}>
+    <PastPerfPicker pastPerfs={pastPerfs} selectedIds={opp.linkedPastPerfIds||[]} onToggle={toggle} label={`Past Performances (${linked.length} linked)`}/>
+    {linked.length===0&&<div style={{...S.card,textAlign:'center',color:B.silver,padding:32,fontSize:12,marginTop:8}}>No records linked. Use the picker above to link from your global library.</div>}
+    {linked.map(pp=><div key={pp.id} style={{...S.card,borderLeft:`3px solid ${'#B066FF'}`,marginTop:8,animation:'fadeIn .2s ease'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
-        <div style={{flex:1}}>
+        <div>
           <div style={{fontSize:14,fontWeight:700,color:'#E8E8F0',marginBottom:5}}>{pp.name}</div>
-          <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
-            {badge(pp.role,pp.role==='Prime'?B.sky:B.supernova)}
-            {pp.cparRating&&badge(pp.cparRating,cparsColor(pp.cparRating))}
-            {badge(pp.agency||'—',B.silver,true)}
-            {pp.contractVehicle&&badge(pp.contractVehicle,'#6699FF',true)}
-            {pp.classification&&pp.classification!=='Unclassified'&&badge(pp.classification,B.twilight,true)}
-          </div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{badge(pp.role,pp.role==='Prime'?B.sky:B.supernova)}{pp.cparRating&&badge(pp.cparRating,cparsColor(pp.cparRating))}{badge(pp.agency||'—',B.silver,true)}</div>
         </div>
-        <div style={{textAlign:'right',flexShrink:0,marginLeft:12}}>
-          <div className="mono" style={{fontSize:17,fontWeight:700,color:'#B066FF'}}>{pp.value||'—'}</div>
-          <div style={{fontSize:10,color:B.silver}}>{pp.periodStart?new Date(pp.periodStart+'T00:00').toLocaleDateString('en-US'):''}{pp.periodEnd?' – '+new Date(pp.periodEnd+'T00:00').toLocaleDateString('en-US'):''}</div>
-          <div style={{display:'flex',alignItems:'center',gap:4,justifyContent:'flex-end',marginTop:4}}>
-            <div style={{width:40,height:4,borderRadius:2,background:B.border,overflow:'hidden'}}><div style={{width:`${score}%`,height:'100%',background:scoreC(score)}}/></div>
-            <span style={{fontSize:9,color:scoreC(score),fontWeight:700}}>{score}% match</span>
-          </div>
+        <div style={{textAlign:'right'}}>
+          <div className="mono" style={{fontSize:18,fontWeight:700,color:'#B066FF'}}>{pp.value||'—'}</div>
+          <div style={{fontSize:10,color:B.silver}}>{pp.periodStart?.slice(0,7)||''}{pp.periodEnd?' – '+pp.periodEnd?.slice(0,7):''}</div>
         </div>
       </div>
-      {(pp.keywords||[]).length>0&&<div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:8}}>{pp.keywords.map(k=><span key={k} style={{padding:'2px 8px',borderRadius:12,background:'#1E1E40',border:`1px solid ${B.border}`,fontSize:9,color:B.silver}}>{k}</span>)}</div>}
       {pp.relevance&&<div style={{background:'#1A1A32',borderRadius:7,padding:'8px 12px',marginBottom:8}}>
-        <div style={{...S.lbl,fontSize:9,marginBottom:3}}>Relevance Note</div>
+        <div style={{...S.lbl,fontSize:9,marginBottom:3}}>Relevance</div>
         <div style={{fontSize:12,color:'#C0C0E0',lineHeight:1.7}}>{pp.relevance}</div>
       </div>}
-      {pp.generatedNarrative&&<div style={{background:'#181832',borderRadius:7,padding:'8px 12px',borderLeft:`2px solid ${'#B066FF'}`,marginBottom:8}}>
-        <div style={{...S.lbl,fontSize:9,marginBottom:3}}>Narrative Excerpt</div>
-        <div style={{fontSize:11,color:'#A0A0C8',lineHeight:1.75}}>{pp.generatedNarrative.slice(0,280)}{pp.generatedNarrative.length>280?'…':''}</div>
+      {pp.generatedNarrative&&<div style={{background:'#181832',borderRadius:7,padding:'8px 12px',borderLeft:`2px solid ${'#B066FF'}`}}>
+        <div style={{...S.lbl,fontSize:9,marginBottom:3}}>Generated Narrative (excerpt)</div>
+        <div style={{fontSize:11,color:'#A0A0C8',lineHeight:1.75}}>{pp.generatedNarrative.slice(0,320)}{pp.generatedNarrative.length>320?'…':''}</div>
       </div>}
-      <button onClick={()=>toggle(pp.id)} style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver,fontSize:10,padding:'4px 10px'}}>Unlink</button>
-    </div>;})}
+      <button onClick={()=>toggle(pp.id)} style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver,fontSize:10,padding:'4px 10px',marginTop:10}}>Unlink</button>
+    </div>)}
   </div>;
 }
 
 /* ═══════════════════ RISKS ═══════════════════ */
-const RISK_CATEGORIES=['Schedule','Cost / Budget','Technical','Programmatic','Staffing','Security / Compliance','Contractual','Supply Chain','Other'];
-const RISK_CAT_COLORS={'Schedule':B.sky,'Cost / Budget':B.supernova,'Technical':B.force,'Programmatic':'#B066FF','Staffing':B.twilight,'Security / Compliance':'#FF88AA','Contractual':'#66CCFF','Supply Chain':'#88FFCC','Other':B.silver};
 function Risks({opp,onChange}){
   const rs=opp.risks||[];
-  const [filterCat,setFilterCat]=useState('All');
-  const add=()=>onChange({...opp,risks:[...rs,{id:Date.now(),name:'New Risk',likelihood:25,impact:'Medium',category:'Schedule',mitigation:'',actioner:'',dueDate:'',status:'Active'}]});
+  const add=()=>onChange({...opp,risks:[...rs,{id:Date.now(),name:'New Risk',likelihood:25,impact:'Medium',mitigation:'',actioner:'',status:'Active'}]});
   const upd=(id,f,v)=>onChange({...opp,risks:rs.map(r=>r.id===id?{...r,[f]:v}:r)});
   const del=id=>onChange({...opp,risks:rs.filter(r=>r.id!==id)});
-  const filtered=filterCat==='All'?rs:rs.filter(r=>(r.category||'Other')===filterCat);
-  const catCounts={};RISK_CATEGORIES.forEach(c=>{catCounts[c]=rs.filter(r=>(r.category||'Other')===c).length;});
   return <div>
     <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}}>
       {['Active','Watch','Closed'].map(s=>{const c=s==='Active'?B.twilight:s==='Watch'?B.supernova:B.refraction;return<div key={s} style={{...S.card,marginBottom:0,textAlign:'center',borderColor:c+'44'}}>
@@ -1926,23 +1505,15 @@ function Risks({opp,onChange}){
         <div style={{...S.lbl,textAlign:'center'}}>{s}</div>
       </div>;})}
     </div>
-    {/* Category filter pills */}
-    <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:12,alignItems:'center'}}>
-      <span style={{fontSize:9,color:B.silver,fontWeight:700,marginRight:4}}>CATEGORY:</span>
-      <button onClick={()=>setFilterCat('All')} style={{...S.btn(filterCat==='All'?B.force:'transparent'),border:`1px solid ${filterCat==='All'?B.force:B.border}`,padding:'3px 10px',fontSize:10,color:filterCat==='All'?'#fff':B.silver}}>All ({rs.length})</button>
-      {RISK_CATEGORIES.filter(c=>catCounts[c]>0).map(c=>{const cc=RISK_CAT_COLORS[c]||B.silver;return<button key={c} onClick={()=>setFilterCat(c)} style={{...S.btn(filterCat===c?cc+'33':'transparent'),border:`1px solid ${filterCat===c?cc:B.border}`,padding:'3px 10px',fontSize:10,color:filterCat===c?cc:B.silver}}>{c} ({catCounts[c]})</button>;})}
-    </div>
     <div style={{display:'flex',justifyContent:'flex-end',marginBottom:10}}><button style={S.btn(B.force)} onClick={add}>+ Add Risk</button></div>
-    {filtered.length===0&&<div style={{...S.card,textAlign:'center',color:B.silver,padding:36,fontSize:12}}>No risks{filterCat!=='All'?` in ${filterCat}`:''} documented yet.</div>}
-    {filtered.map(r=>{const c=r.impact==='High'?B.twilight:r.impact==='Medium'?B.supernova:B.silver;const score=r.likelihood*(r.impact==='High'?3:r.impact==='Medium'?2:1);const catC=RISK_CAT_COLORS[r.category||'Other']||B.silver;return<div key={r.id} style={{...S.card,borderLeft:`3px solid ${c}`}}>
+    {rs.length===0&&<div style={{...S.card,textAlign:'center',color:B.silver,padding:36,fontSize:12}}>No risks documented yet.</div>}
+    {rs.map(r=>{const c=r.impact==='High'?B.twilight:r.impact==='Medium'?B.supernova:B.silver;const score=r.likelihood*(r.impact==='High'?3:r.impact==='Medium'?2:1);return<div key={r.id} style={{...S.card,borderLeft:`3px solid ${c}`}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
         <div style={{flex:1}}>
           <input style={{...S.inp,fontWeight:700,fontSize:13,color:'#E8E8F8',background:'transparent',border:'none',padding:'0 0 5px',width:'100%'}} value={r.name||''} onChange={e=>upd(r.id,'name',e.target.value)} placeholder="Risk description…"/>
           <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
-            <select style={{...S.inp,width:'auto',padding:'3px 6px',fontSize:11}} value={r.category||'Other'} onChange={e=>upd(r.id,'category',e.target.value)}>{RISK_CATEGORIES.map(c=><option key={c}>{c}</option>)}</select>
             <select style={{...S.inp,width:'auto',padding:'3px 6px',fontSize:11}} value={r.impact} onChange={e=>upd(r.id,'impact',e.target.value)}><option>High</option><option>Medium</option><option>Low</option></select>
             <select style={{...S.inp,width:'auto',padding:'3px 6px',fontSize:11}} value={r.status} onChange={e=>upd(r.id,'status',e.target.value)}><option>Active</option><option>Watch</option><option>Closed</option></select>
-            {badge(r.category||'Other',catC,true)}
             <span style={{padding:'2px 8px',borderRadius:5,background:c+'22',color:c,fontSize:10,fontWeight:700}}>Score: {score}</span>
           </div>
         </div>
@@ -1953,10 +1524,9 @@ function Risks({opp,onChange}){
           <button style={{...S.btn('transparent'),border:'none',color:B.twilight,fontSize:10,cursor:'pointer',marginTop:4,padding:0}} onClick={()=>del(r.id)}>✕ Remove</button>
         </div>
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
         <div><span style={S.lbl}>Mitigation</span><textarea style={{...ta,minHeight:50,fontSize:11}} value={r.mitigation||''} onChange={e=>upd(r.id,'mitigation',e.target.value)}/></div>
         <div><span style={S.lbl}>Actioner</span><input style={S.inp} value={r.actioner||''} onChange={e=>upd(r.id,'actioner',e.target.value)}/></div>
-        <div><span style={S.lbl}>Due Date</span><input style={S.inp} type="date" value={r.dueDate||''} onChange={e=>upd(r.id,'dueDate',e.target.value)}/></div>
       </div>
     </div>;})}
   </div>;
@@ -2004,33 +1574,13 @@ function ActionItems({opp,onChange}){
 }
 
 /* ═══════════════════ PAST PERF LIBRARY ═══════════════════ */
-function PastPerfLibrary({pastPerfs,setPastPerfs,proofPoints,opps,fileStore,addFiles,removeFile,toast}){
-  const [autoTagResult,setAutoTagResult]=useState(null);
-  const runAutoTag=(pp)=>{
-    const result=autoTagPastPerf(pp);
-    if(result.suggestedTags.length===0&&result.suggestedKeywords.length===0){toast('No new tags detected');return;}
-    setAutoTagResult({ppId:pp.id,...result});
-  };
-  const applyAutoTags=(ppId)=>{
-    if(!autoTagResult)return;
-    const pp=pastPerfs.find(p=>p.id===ppId);if(!pp)return;
-    const newTags=[...new Set([...(pp.tags||[]),...autoTagResult.suggestedTags])];
-    const newKw=[...new Set([...(pp.keywords||[]),...autoTagResult.suggestedKeywords])];
-    setPastPerfs(x=>x.map(p=>p.id===ppId?{...p,tags:newTags,keywords:newKw}:p));
-    setAutoTagResult(null);
-    toast(`Applied ${autoTagResult.suggestedTags.length} tags + ${autoTagResult.suggestedKeywords.length} keywords`);
-  };
+function PastPerfLibrary({pastPerfs,setPastPerfs,proofPoints,fileStore,addFiles,removeFile,toast}){
   const [sel,setSel]=useState(null);
   const [q,setQ]=useState('');
   const [filterRole,setFilterRole]=useState('All');
-  const ppReuse=useMemo(()=>{const c={};pastPerfs.forEach(p=>{c[p.id]={count:0,opps:[]};});(opps||[]).forEach(o=>{(o.linkedPastPerfIds||[]).forEach(id=>{if(c[id]){c[id].count++;c[id].opps.push(o.name||'Untitled');}});});return c;},[opps,pastPerfs]);
-  const [filterVehicle,setFilterVehicle]=useState('All');
-  const [filterRange,setFilterRange]=useState('All');
-  const [filterKw,setFilterKw]=useState('All');
-  const [showFilters,setShowFilters]=useState(false);
   const [confirmDel,setConfirmDel]=useState(null);
   const [generating,setGenerating]=useState(false);
-  const blank=()=>({id:Date.now(),name:'',contractNumber:'',agency:'',prime:'Astrion Group, LLC',contractorName:'',value:'',role:'Prime',contractType:'IDIQ/TO',contractVehicle:'',setAside:'Full & Open',valueRange:'',classification:'Unclassified',periodStart:'',periodEnd:'',naics:'',keywords:[],description:'',scope:'',relevance:'',keyAchievements:'',strength:'Strong',pocName:'',pocTitle:'',pocEmail:'',pocPhone:'',cparRating:'Very Good',categories:[],proofPointIds:[],fileIds:[],generatedNarrative:'',tags:[],usageHistory:[],createdAt:new Date().toISOString()});
+  const blank=()=>({id:Date.now(),name:'',contractNumber:'',agency:'',prime:'Astrion Group, LLC',value:'',role:'Prime',periodStart:'',periodEnd:'',naics:'',description:'',scope:'',relevance:'',keyAchievements:'',pocName:'',pocTitle:'',pocEmail:'',pocPhone:'',cparRating:'Very Good',categories:[],proofPointIds:[],fileIds:[],generatedNarrative:'',tags:[],createdAt:new Date().toISOString()});
   const addPP=()=>{const p=blank();setPastPerfs(x=>[...x,p]);setSel(p.id);};
   const updPP=(id,f,v)=>setPastPerfs(x=>x.map(p=>p.id===id?{...p,[f]:v}:p));
   const delPP=id=>{setPastPerfs(x=>x.filter(p=>p.id!==id));if(sel===id)setSel(null);setConfirmDel(null);toast('Past performance deleted');};
@@ -2038,118 +1588,65 @@ function PastPerfLibrary({pastPerfs,setPastPerfs,proofPoints,opps,fileStore,addF
     const pp=pastPerfs.find(x=>x.id===id);if(!pp)return;
     setGenerating(true);
     try{const r=await callClaude('Senior proposal writer at Astrion. Write compelling Shipley past performance narratives. Active voice, specific metrics, concrete outcomes.',
-      `Generate a past performance narrative for a federal proposal.\n\nContract: ${pp.name}\nContractor: ${pp.contractorName||'Astrion Group, LLC'}\nAgency: ${pp.agency}\nValue: ${pp.value}\nRole: ${pp.role}\nContract Vehicle: ${pp.contractVehicle||'N/A'}\nPeriod: ${pp.periodStart} – ${pp.periodEnd}\nCPARS: ${pp.cparRating}\nNAICS: ${pp.naics}\nCapability Keywords: ${(pp.keywords||[]).join(', ')||'N/A'}\nDescription: ${pp.description}\nScope: ${pp.scope}\nKey Achievements: ${pp.keyAchievements}\nRelevance: ${pp.relevance}\n\n3-4 paragraphs: (1) contract overview, (2) Astrion contributions with metrics, (3) relevance to new requirement. Under 300 words.`);
+      `Generate a past performance narrative for a federal proposal.\n\nContract: ${pp.name}\nAgency: ${pp.agency}\nValue: ${pp.value}\nRole: ${pp.role}\nPeriod: ${pp.periodStart} – ${pp.periodEnd}\nCPARS: ${pp.cparRating}\nDescription: ${pp.description}\nScope: ${pp.scope}\nKey Achievements: ${pp.keyAchievements}\nRelevance: ${pp.relevance}\n\n3-4 paragraphs: (1) contract overview, (2) Astrion contributions with metrics, (3) relevance to new requirement. Under 300 words.`);
       updPP(id,'generatedNarrative',r.trim());toast('Narrative generated');}catch(e){toast('Generation failed','error');}
     setGenerating(false);
   };
-  const vehicles=['All',...[...new Set(pastPerfs.map(p=>p.contractVehicle).filter(Boolean))]];
-  const ranges=['All',...VALUE_RANGES];
-  const allKw=['All',...[...new Set(pastPerfs.flatMap(p=>p.keywords||[]))]];
-  const filtered=pastPerfs.filter(p=>{
-    if(q&&!(p.name+p.agency+p.contractNumber+(p.keywords||[]).join(' ')+p.description).toLowerCase().includes(q.toLowerCase()))return false;
-    if(filterRole!=='All'&&p.role!==filterRole)return false;
-    if(filterVehicle!=='All'&&p.contractVehicle!==filterVehicle)return false;
-    if(filterRange!=='All'&&p.valueRange!==filterRange)return false;
-    if(filterKw!=='All'&&!(p.keywords||[]).includes(filterKw))return false;
-    return true;
-  });
+  const filtered=pastPerfs.filter(p=>(!q||(p.name+p.agency+p.contractNumber).toLowerCase().includes(q.toLowerCase()))&&(filterRole==='All'||p.role===filterRole));
   const cur=pastPerfs.find(p=>p.id===sel);
-  const totalUses=cur?(cur.usageHistory||[]).length:0;
-  const recentEnd=cur&&cur.periodEnd?Math.max(0,new Date().getFullYear()-parseInt(cur.periodEnd.slice(0,4))):null;
-  const isRecent=recentEnd!==null&&recentEnd<=3;
   return <div style={{display:'flex',height:'100%',overflow:'hidden'}}>
     {confirmDel&&<ConfirmModal message={`Delete "${pastPerfs.find(p=>p.id===confirmDel)?.name||'this record'}"?`} onConfirm={()=>delPP(confirmDel)} onCancel={()=>setConfirmDel(null)}/>}
-    {/* LEFT PANEL */}
-    <div style={{width:310,borderRight:`1px solid ${B.border}`,display:'flex',flexDirection:'column',flexShrink:0}}>
+    <div style={{width:300,borderRight:`1px solid ${B.border}`,display:'flex',flexDirection:'column',flexShrink:0}}>
       <div style={{padding:'14px 16px',borderBottom:`1px solid ${B.border}`}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
           <div style={{fontSize:14,fontWeight:700,color:'#F0F0FF'}}>Past Performances</div>
           <button style={{...S.btn(B.force),padding:'5px 12px',fontSize:11}} onClick={addPP}>+ Add</button>
         </div>
-        <div style={{position:'relative',marginBottom:6}}>
+        <div style={{position:'relative',marginBottom:8}}>
           <span style={{position:'absolute',left:8,top:'50%',transform:'translateY(-50%)',fontSize:12,color:B.silver}}>🔍</span>
-          <input style={{...S.inp,fontSize:11,paddingLeft:26}} placeholder="Search name, agency, keyword…" value={q} onChange={e=>setQ(e.target.value)}/>
+          <input style={{...S.inp,fontSize:11,paddingLeft:26}} placeholder="Search…" value={q} onChange={e=>setQ(e.target.value)}/>
         </div>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
-          <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-            {['All','Prime','Sub'].map(r=><button key={r} onClick={()=>setFilterRole(r)} style={{padding:'3px 10px',borderRadius:20,border:`1px solid ${filterRole===r?B.force:B.border}`,background:filterRole===r?B.force+'22':'transparent',color:filterRole===r?B.sky:B.silver,fontSize:10,cursor:'pointer'}}>{r}</button>)}
-          </div>
-          <button onClick={()=>setShowFilters(!showFilters)} style={{...S.btn('transparent'),border:`1px solid ${B.border}`,fontSize:10,color:showFilters?B.sky:B.silver,padding:'3px 8px'}}>⚙ Filters{showFilters?' ▲':' ▼'}</button>
+        <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+          {['All','Prime','Sub'].map(r=><button key={r} onClick={()=>setFilterRole(r)} style={{padding:'3px 10px',borderRadius:20,border:`1px solid ${filterRole===r?B.force:B.border}`,background:filterRole===r?B.force+'22':'transparent',color:filterRole===r?B.sky:B.silver,fontSize:10,cursor:'pointer'}}>{r}</button>)}
         </div>
-        {showFilters&&<div style={{marginTop:6,display:'flex',flexDirection:'column',gap:5,animation:'fadeIn .15s ease'}}>
-          <select style={{...S.inp,fontSize:10,padding:'4px 6px'}} value={filterVehicle} onChange={e=>setFilterVehicle(e.target.value)}>
-            {vehicles.map(v=><option key={v}>{v}</option>)}
-          </select>
-          <select style={{...S.inp,fontSize:10,padding:'4px 6px'}} value={filterRange} onChange={e=>setFilterRange(e.target.value)}>
-            {ranges.map(r=><option key={r}>{r}</option>)}
-          </select>
-          <select style={{...S.inp,fontSize:10,padding:'4px 6px'}} value={filterKw} onChange={e=>setFilterKw(e.target.value)}>
-            {allKw.map(k=><option key={k}>{k}</option>)}
-          </select>
-          {(filterVehicle!=='All'||filterRange!=='All'||filterKw!=='All')&&<button onClick={()=>{setFilterVehicle('All');setFilterRange('All');setFilterKw('All');}} style={{...S.btn('transparent'),border:`1px solid ${B.border}`,fontSize:10,color:B.twilight,padding:'3px 8px'}}>✕ Clear Filters</button>}
-        </div>}
       </div>
       <div style={{flex:1,overflowY:'auto',padding:'8px'}}>
-        {filtered.length===0&&<div style={{textAlign:'center',color:B.silver,fontSize:12,padding:24}}>No records match.</div>}
-        {filtered.map(pp=>{
-          const uses=(pp.usageHistory||[]).length;
-          const yrEnd=pp.periodEnd?parseInt(pp.periodEnd.slice(0,4)):0;
-          const fresh=yrEnd>=new Date().getFullYear()-3;
-          return<div key={pp.id} onClick={()=>setSel(pp.id)} className="card-hover"
-            style={{padding:'10px 12px',borderRadius:8,cursor:'pointer',marginBottom:4,border:`1px solid ${sel===pp.id?B.force:B.border}`,background:sel===pp.id?B.force+'18':'transparent',transition:'all .12s'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:6}}>
-              <div style={{fontSize:12,fontWeight:700,color:'#E8E8F0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{pp.name||'Untitled'}</div>
-              <div style={{display:'flex',gap:3,flexShrink:0}}>
-                {badge(pp.role,pp.role==='Prime'?B.sky:B.supernova,true)}
-                {fresh&&<span style={{fontSize:8,padding:'1px 5px',borderRadius:8,background:B.refraction+'22',color:B.refraction,border:`1px solid ${B.refraction}44`}}>RECENT</span>}
-              </div>
-            </div>
-            <div style={{fontSize:10,color:B.silver,marginTop:2}}>{pp.agency||'—'} · {pp.value||'TBD'}{pp.contractorName?' · '+pp.contractorName:''}</div>
-            <div style={{display:'flex',gap:4,flexWrap:'wrap',marginTop:4,alignItems:'center'}}>
-              {pp.cparRating&&badge(pp.cparRating,cparsColor(pp.cparRating),true)}
-              {pp.contractVehicle&&badge(pp.contractVehicle,'#6699FF',true)}
-              {uses>0&&<span style={{fontSize:9,color:B.sky}}>Used {uses}×</span>}
-              {ppReuse[pp.id]&&<ReuseBadge count={ppReuse[pp.id].count} oppNames={ppReuse[pp.id].opps}/>}
-            </div>
-            {(pp.keywords||[]).length>0&&<div style={{fontSize:9,color:B.silver,marginTop:3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{pp.keywords.slice(0,3).join(' · ')}{pp.keywords.length>3?' …':''}</div>}
-            {(pp.tags||[]).length>0&&<div style={{display:'flex',gap:2,flexWrap:'wrap',marginTop:3}}>{pp.tags.slice(0,3).map(t=><span key={t} style={{fontSize:7,padding:'0px 4px',borderRadius:6,background:tagColor(t)+'22',color:tagColor(t),border:`1px solid ${tagColor(t)}33`}}>{t}</span>)}{pp.tags.length>3&&<span style={{fontSize:7,color:B.silver}}>+{pp.tags.length-3}</span>}</div>}
-          </div>;})}
+        {filtered.length===0&&<div style={{textAlign:'center',color:B.silver,fontSize:12,padding:24}}>No records yet.</div>}
+        {filtered.map(pp=><div key={pp.id} onClick={()=>setSel(pp.id)} className="card-hover"
+          style={{padding:'10px 12px',borderRadius:8,cursor:'pointer',marginBottom:4,border:`1px solid ${sel===pp.id?B.force:B.border}`,background:sel===pp.id?B.force+'18':'transparent',transition:'all .12s'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:6}}>
+            <div style={{fontSize:12,fontWeight:700,color:'#E8E8F0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{pp.name||'Untitled'}</div>
+            {badge(pp.role,pp.role==='Prime'?B.sky:B.supernova,true)}
+          </div>
+          <div style={{fontSize:10,color:B.silver,marginTop:2}}>{pp.agency||'—'} · {pp.value||'TBD'}</div>
+          {pp.cparRating&&<div style={{marginTop:4}}>{badge(pp.cparRating,cparsColor(pp.cparRating),true)}</div>}
+        </div>)}
       </div>
-      <div style={{padding:'10px 12px',borderTop:`1px solid ${B.border}`,fontSize:10,color:B.silver}}>{pastPerfs.length} records · {pastPerfs.filter(p=>p.role==='Prime').length} Prime · {pastPerfs.filter(p=>p.role==='Sub').length} Sub · {pastPerfs.filter(p=>{const y=p.periodEnd?parseInt(p.periodEnd.slice(0,4)):0;return y>=new Date().getFullYear()-3;}).length} Recent</div>
+      <div style={{padding:'10px 12px',borderTop:`1px solid ${B.border}`,fontSize:10,color:B.silver}}>{pastPerfs.length} record{pastPerfs.length!==1?'s':''} · {pastPerfs.filter(p=>p.role==='Prime').length} Prime · {pastPerfs.filter(p=>p.role==='Sub').length} Sub</div>
     </div>
-    {/* RIGHT PANEL */}
     <div style={{flex:1,overflowY:'auto',padding:'20px 24px'}}>
       {!cur&&<div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'60vh',gap:16}}>
         <div style={{fontSize:42}}>🏆</div>
         <div style={{textAlign:'center'}}>
           <div style={{fontSize:16,fontWeight:700,color:'#D0D0F0',marginBottom:6}}>Past Performance Library</div>
-          <div style={{fontSize:12,color:B.silver,marginBottom:18,lineHeight:1.7,maxWidth:400}}>Build your persistent record bank. Tag each contract with NAICS, vehicle, keywords, and value range — the smart match engine will surface the right records for every new pursuit.</div>
+          <div style={{fontSize:12,color:B.silver,marginBottom:18,lineHeight:1.7,maxWidth:380}}>Track records and generate narrative sections for proposals, relevance statements, and capability statements.</div>
           <button style={{...S.btn(B.force),padding:'9px 22px'}} onClick={addPP}>+ Add First Record</button>
         </div>
       </div>}
       {cur&&<div style={{animation:'fadeIn .2s ease'}}>
-        {/* Header */}
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:16}}>
-          <div style={{flex:1}}>
-            <input style={{...S.inp,fontSize:17,fontWeight:700,background:'transparent',border:'none',padding:'0 0 4px',color:'#F0F0FF',width:'100%'}} value={cur.name} onChange={e=>updPP(cur.id,'name',e.target.value)} placeholder="Contract / Program Name"/>
+          <div>
+            <input style={{...S.inp,fontSize:17,fontWeight:700,background:'transparent',border:'none',padding:'0 0 4px',color:'#F0F0FF',width:420}} value={cur.name} onChange={e=>updPP(cur.id,'name',e.target.value)} placeholder="Contract / Program Name"/>
             <div style={{display:'flex',gap:6,marginTop:4,flexWrap:'wrap',alignItems:'center'}}>
-              {badge(cur.role,cur.role==='Prime'?B.sky:B.supernova)}
-              {cur.cparRating&&badge(cur.cparRating,cparsColor(cur.cparRating))}
-              {cur.contractVehicle&&badge(cur.contractVehicle,'#6699FF')}
-              {cur.classification&&cur.classification!=='Unclassified'&&badge(cur.classification,B.twilight)}
-              {isRecent&&<span style={{padding:'2px 8px',borderRadius:20,background:B.refraction+'22',color:B.refraction,fontSize:10,border:`1px solid ${B.refraction}44`}}>✓ Recent</span>}
-              {cur.value&&<span style={{fontSize:12,color:B.silver}}>· {cur.value}</span>}
-              {totalUses>0&&<span style={{fontSize:11,color:B.sky}}>· Used {totalUses}× in proposals</span>}
+              {badge(cur.role,cur.role==='Prime'?B.sky:B.supernova)}{cur.cparRating&&badge(cur.cparRating,cparsColor(cur.cparRating))}{cur.value&&<span style={{fontSize:12,color:B.silver}}>· {cur.value}</span>}
             </div>
           </div>
-          <div style={{display:'flex',gap:8,flexShrink:0,marginLeft:12}}>
-            <button style={{...S.btn(B.refraction+'33'),border:`1px solid ${B.refraction}66`,color:B.refraction,padding:'7px 14px',fontSize:12}} onClick={()=>runAutoTag(cur)}>⚡ Auto-Tag</button>
+          <div style={{display:'flex',gap:8}}>
             <button style={{...S.btn(generating?B.border:B.force),opacity:generating?0.6:1,padding:'7px 16px',fontSize:12}} onClick={()=>genNarrative(cur.id)} disabled={generating}>{generating?<><span className="spinner"/> Generating…</>:'✦ Generate Narrative'}</button>
             <button style={{...S.btn('transparent'),border:`1px solid ${B.twilight}44`,color:B.twilight,fontSize:11,padding:'5px 10px'}} onClick={()=>setConfirmDel(cur.id)}>🗑</button>
           </div>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-          {/* Contract Details */}
           <div style={S.card}>
             <div style={S.hdg}>Contract Details</div>
             {[{k:'contractNumber',l:'Contract Number'},{k:'agency',l:'Agency / Customer'},{k:'value',l:'Contract Value'},{k:'naics',l:'NAICS Code'}].map(({k,l})=>(
@@ -2158,89 +1655,35 @@ function PastPerfLibrary({pastPerfs,setPastPerfs,proofPoints,opps,fileStore,addF
             <div style={{marginBottom:10}}><span style={S.lbl}>Astrion Role</span><select style={S.inp} value={cur.role} onChange={e=>updPP(cur.id,'role',e.target.value)}><option>Prime</option><option>Sub</option><option>JV Partner</option><option>Teaming Partner</option></select></div>
             <div style={{marginBottom:10}}><span style={S.lbl}>CPARS Rating</span><select style={{...S.inp,color:cparsColor(cur.cparRating)}} value={cur.cparRating||''} onChange={e=>updPP(cur.id,'cparRating',e.target.value)}><option value="">Not Rated</option>{CPARS.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-              <div><span style={S.lbl}>PoP Start</span><input style={S.inp} type="date" value={cur.periodStart||''} onChange={e=>updPP(cur.id,'periodStart',e.target.value)}/></div>
-              <div><span style={S.lbl}>PoP End</span><input style={S.inp} type="date" value={cur.periodEnd||''} onChange={e=>updPP(cur.id,'periodEnd',e.target.value)}/></div>
+              <div><span style={S.lbl}>Period Start</span><input style={S.inp} type="month" value={cur.periodStart||''} onChange={e=>updPP(cur.id,'periodStart',e.target.value)}/></div>
+              <div><span style={S.lbl}>Period End</span><input style={S.inp} type="month" value={cur.periodEnd||''} onChange={e=>updPP(cur.id,'periodEnd',e.target.value)}/></div>
             </div>
-            <div style={{marginTop:10}}><span style={S.lbl}>Contractor Name</span><input style={S.inp} value={cur.contractorName||''} onChange={e=>updPP(cur.id,'contractorName',e.target.value)} placeholder="e.g. Astrion Group, LLC"/></div>
           </div>
-          {/* Acquisition Context */}
           <div style={S.card}>
-            <div style={S.hdg}>Acquisition Context</div>
-            <div style={{marginBottom:10}}><span style={S.lbl}>Contract Type</span><select style={S.inp} value={cur.contractType||'IDIQ/TO'} onChange={e=>updPP(cur.id,'contractType',e.target.value)}>{CONTRACT_TYPES.map(t=><option key={t}>{t}</option>)}</select></div>
-            <div style={{marginBottom:10}}><span style={S.lbl}>Contract Vehicle</span><select style={S.inp} value={cur.contractVehicle||''} onChange={e=>updPP(cur.id,'contractVehicle',e.target.value)}><option value="">— Select —</option>{CONTRACT_VEHICLES.map(v=><option key={v}>{v}</option>)}</select></div>
-            <div style={{marginBottom:10}}><span style={S.lbl}>Set-Aside Type</span><select style={S.inp} value={cur.setAside||'Full & Open'} onChange={e=>updPP(cur.id,'setAside',e.target.value)}>{SET_ASIDE_TYPES.map(s=><option key={s}>{s}</option>)}</select></div>
-            <div style={{marginBottom:10}}><span style={S.lbl}>Dollar Range Band</span><select style={S.inp} value={cur.valueRange||''} onChange={e=>updPP(cur.id,'valueRange',e.target.value)}><option value="">— Select —</option>{VALUE_RANGES.map(r=><option key={r}>{r}</option>)}</select></div>
-            <div style={{marginBottom:10}}><span style={S.lbl}>Classification Level</span><select style={{...S.inp,color:cur.classification!=='Unclassified'?B.twilight:'inherit'}} value={cur.classification||'Unclassified'} onChange={e=>updPP(cur.id,'classification',e.target.value)}>{CLASSIFICATION_LEVELS.map(c=><option key={c}>{c}</option>)}</select></div>
-            <div><span style={S.lbl}>Strength Assessment</span><select style={S.inp} value={cur.strength||'Strong'} onChange={e=>updPP(cur.id,'strength',e.target.value)}>{PP_STRENGTH.map(s=><option key={s}>{s}</option>)}</select></div>
+            <div style={S.hdg}>POC &amp; References</div>
+            {[{k:'pocName',l:'POC Full Name'},{k:'pocTitle',l:'POC Title'},{k:'pocEmail',l:'POC Email'},{k:'pocPhone',l:'POC Phone'}].map(({k,l})=>(
+              <div key={k} style={{marginBottom:10}}><span style={S.lbl}>{l}</span><input style={S.inp} type={k==='pocEmail'?'email':k==='pocPhone'?'tel':'text'} value={cur[k]||''} onChange={e=>updPP(cur.id,k,e.target.value)}/></div>
+            ))}
           </div>
         </div>
-        {/* Auto-Tag Suggestions */}
-        {autoTagResult&&autoTagResult.ppId===cur.id&&<div style={{...S.card,border:`1px solid ${B.refraction}66`,background:'#0D1F15'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-            <div style={S.hdg}>⚡ Auto-Tag Suggestions</div>
-            <div style={{display:'flex',gap:6}}>
-              <button style={{...S.btn(B.refraction),padding:'5px 14px',fontSize:11}} onClick={()=>applyAutoTags(cur.id)}>✓ Apply All</button>
-              <button style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver,padding:'5px 10px',fontSize:11}} onClick={()=>setAutoTagResult(null)}>✕ Dismiss</button>
-            </div>
-          </div>
-          {autoTagResult.suggestedTags.length>0&&<div style={{marginBottom:8}}>
-            <span style={{...S.lbl,fontSize:9}}>SUGGESTED TAGS</span>
-            <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{autoTagResult.suggestedTags.map(t=><span key={t} style={{padding:'3px 10px',borderRadius:20,background:B.refraction+'22',color:B.refraction,fontSize:10,border:`1px solid ${B.refraction}44`}}>{t}</span>)}</div>
-          </div>}
-          {autoTagResult.suggestedKeywords.length>0&&<div>
-            <span style={{...S.lbl,fontSize:9}}>SUGGESTED KEYWORDS</span>
-            <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{autoTagResult.suggestedKeywords.map(k=><span key={k} style={{padding:'3px 10px',borderRadius:20,background:B.sky+'22',color:B.sky,fontSize:10,border:`1px solid ${B.sky}44`}}>{k}</span>)}</div>
-          </div>}
-        </div>}
-        {/* Capability Keywords */}
-        <div style={S.card}>
-          <div style={S.hdg}>Capability Keywords <span style={{fontWeight:400,color:B.silver,fontSize:10}}> — drives smart match scoring</span></div>
-          <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
-            {CAPABILITY_KEYWORDS.map(k=>{const on=(cur.keywords||[]).includes(k);return<button key={k} onClick={()=>updPP(cur.id,'keywords',on?(cur.keywords||[]).filter(x=>x!==k):[...(cur.keywords||[]),k])} style={{padding:'4px 11px',borderRadius:20,border:`1px solid ${on?B.sky:B.border}`,background:on?B.sky+'22':'transparent',color:on?B.sky:B.silver,fontSize:10,cursor:'pointer',transition:'all .1s'}}>{k}</button>;})}
-          </div>
-          {(cur.keywords||[]).length===0&&<div style={{fontSize:11,color:B.silver}}>Select keywords that describe the technical and functional scope of this contract.</div>}
-        </div>
-        {/* Performance Description */}
         <div style={S.card}>
           <div style={S.hdg}>Performance Description</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
             <div><span style={S.lbl}>Contract Scope</span><textarea style={{...ta,minHeight:90}} value={cur.description||''} onChange={e=>updPP(cur.id,'description',e.target.value)}/></div>
             <div><span style={S.lbl}>Key Achievements &amp; Metrics</span><textarea style={{...ta,minHeight:90}} value={cur.keyAchievements||''} onChange={e=>updPP(cur.id,'keyAchievements',e.target.value)}/></div>
             <div><span style={S.lbl}>Technical Scope</span><textarea style={ta} value={cur.scope||''} onChange={e=>updPP(cur.id,'scope',e.target.value)}/></div>
-            <div><span style={S.lbl}>Relevance / Application Note</span><textarea style={ta} value={cur.relevance||''} onChange={e=>updPP(cur.id,'relevance',e.target.value)}/></div>
+            <div><span style={S.lbl}>Relevance / Application</span><textarea style={ta} value={cur.relevance||''} onChange={e=>updPP(cur.id,'relevance',e.target.value)}/></div>
           </div>
         </div>
-        {/* POC */}
-        <div style={S.card}>
-          <div style={S.hdg}>Point of Contact</div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-            {[{k:'pocName',l:'POC Full Name'},{k:'pocTitle',l:'POC Title'},{k:'pocEmail',l:'POC Email'},{k:'pocPhone',l:'POC Phone'}].map(({k,l})=>(
-              <div key={k}><span style={S.lbl}>{l}</span><input style={S.inp} type={k==='pocEmail'?'email':k==='pocPhone'?'tel':'text'} value={cur[k]||''} onChange={e=>updPP(cur.id,k,e.target.value)}/></div>
-            ))}
-          </div>
-        </div>
-        {/* Generated Narrative */}
         {cur.generatedNarrative&&<div style={{...S.card,border:`1px solid ${'#B066FF'}44`}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
             <div style={S.hdg}>Generated Proposal Narrative</div>
-            <div style={{display:'flex',gap:8}}>
-              {badge('AI-Generated','#B066FF')}
-              <button style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver,fontSize:11,padding:'4px 10px'}} onClick={()=>navigator.clipboard.writeText(cur.generatedNarrative).then(()=>toast('Copied!'))}>📋 Copy</button>
-              <button style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver,fontSize:11,padding:'4px 10px'}} onClick={()=>{exportToPDF(cur.generatedNarrative,cur.name+' — Narrative',cur.agency+' · '+cur.value);toast('PDF downloaded');}}>↓ PDF</button>
-              <button style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver,fontSize:11,padding:'4px 10px'}} onClick={()=>{exportToDoc(cur.generatedNarrative,cur.name+' — Narrative',cur.agency+' · '+cur.value);toast('Word downloaded');}}>↓ Word</button>
-            </div>
+            <div style={{display:'flex',gap:8}}>{badge('AI-Generated','#B066FF')}<button style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver,fontSize:11,padding:'4px 10px'}} onClick={()=>navigator.clipboard.writeText(cur.generatedNarrative).then(()=>toast('Copied!'))}>📋 Copy</button>
+            <button style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver,fontSize:11,padding:'4px 10px'}} onClick={()=>{exportToPDF(cur.generatedNarrative,cur.name+' — Narrative',cur.agency+' · '+cur.value);toast('PDF downloaded');}}>↓ PDF</button>
+            <button style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver,fontSize:11,padding:'4px 10px'}} onClick={()=>{exportToDoc(cur.generatedNarrative,cur.name+' — Narrative',cur.agency+' · '+cur.value);toast('Word downloaded');}}>↓ Word</button></div>
           </div>
           <textarea style={{...ta,minHeight:150,color:'#D0D0E8',fontSize:13,lineHeight:1.85}} value={cur.generatedNarrative} onChange={e=>updPP(cur.id,'generatedNarrative',e.target.value)}/>
         </div>}
-        {/* Usage History */}
-        {(cur.usageHistory||[]).length>0&&<div style={S.card}>
-          <div style={S.hdg}>Proposal Usage History</div>
-          {[...(cur.usageHistory||[])].reverse().map((u,i)=><div key={i} style={{display:'flex',gap:8,padding:'6px 0',borderBottom:`1px solid ${B.border}`,alignItems:'center'}}>
-            <span style={{fontSize:11}}>{u.docType==='pastperf'?'🏆':u.docType==='rfp'?'📋':'📄'}</span>
-            <div style={{flex:1}}><div style={{fontSize:11,color:'#D0D0F0'}}>{u.oppName||'Unknown Opportunity'}</div><div style={{fontSize:10,color:B.silver}}>{u.docType} · {u.date?.slice(0,10)||'—'}</div></div>
-          </div>)}
-        </div>}
-        {/* Tags & Linking */}
         <div style={S.card}>
           <div style={S.hdg}>Tags</div>
           <TagEditor tags={cur.tags||[]} onChange={v=>updPP(cur.id,'tags',v)}/>
@@ -2259,229 +1702,105 @@ function PastPerfLibrary({pastPerfs,setPastPerfs,proofPoints,opps,fileStore,addF
 }
 
 /* ═══════════════════ PROOF POINTS LIBRARY ═══════════════════ */
-function ProofPointLibrary({proofPoints,setProofPoints,pastPerfs,opps,fileStore,addFiles,removeFile,toast}){
+function ProofPointLibrary({proofPoints,setProofPoints,pastPerfs,fileStore,addFiles,removeFile,toast}){
   const [sel,setSel]=useState(null);
   const [q,setQ]=useState('');
   const [filterCat,setFilterCat]=useState('All');
-  const [verifiedFilter,setVerifiedFilter]=useState('All');
-  const [sortBy,setSortBy]=useState('updatedAt');
-  const [sortDir,setSortDir]=useState('desc');
-  const [viewMode,setViewMode]=useState('grid');
   const [confirmDel,setConfirmDel]=useState(null);
   const [enhancing,setEnhancing]=useState(false);
-  const [showImport,setShowImport]=useState(false);
-  const fileRef=useRef(null);
-  const catColor=c=>PP_CAT_COLORS[c]||B.silver;
-  const reuse=useMemo(()=>{const c={};proofPoints.forEach(p=>{c[p.id]={count:0,opps:[]};});(opps||[]).forEach(o=>{const ids=new Set();(o.solutioning||[]).forEach(s=>(s.proofPointIds||[]).forEach(id=>ids.add(id)));(o.winThemes||[]).forEach(t=>(t.proofPointIds||[]).forEach(id=>ids.add(id)));ids.forEach(id=>{if(c[id]){c[id].count++;c[id].opps.push(o.name||'Untitled');}});});return c;},[opps,proofPoints]);
-
-  const blank=()=>({id:Date.now(),title:'',metric:'',value:'',context:'',description:'',category:PP_CATEGORIES[0],source:'',sourceProgram:'',sourceAgency:'',dateAchieved:'',tags:[],pastPerfIds:[],usageHistory:[],fileIds:[],enhanced:'',starred:false,verified:false,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
+  const blank=()=>({id:Date.now(),title:'',metric:'',context:'',category:'Technical',source:'',tags:[],pastPerfIds:[],usageHistory:[],fileIds:[],enhanced:'',createdAt:new Date().toISOString()});
   const addPP=()=>{const p=blank();setProofPoints(x=>[...x,p]);setSel(p.id);};
-  const upd=(id,f,v)=>setProofPoints(x=>x.map(p=>p.id===id?{...p,[f]:v,updatedAt:new Date().toISOString()}:p));
+  const upd=(id,f,v)=>setProofPoints(x=>x.map(p=>p.id===id?{...p,[f]:v}:p));
   const del=id=>{setProofPoints(x=>x.filter(p=>p.id!==id));if(sel===id)setSel(null);setConfirmDel(null);toast('Proof point deleted');};
-  const toggleStar=id=>upd(id,'starred',!(proofPoints.find(p=>p.id===id)?.starred));
-  const toggleVerified=id=>upd(id,'verified',!(proofPoints.find(p=>p.id===id)?.verified));
-  const duplicatePP=pp=>{const copy={...pp,id:Date.now(),title:pp.title+' (Copy)',usageHistory:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};setProofPoints(x=>[...x,copy]);setSel(copy.id);toast('Duplicated');};
-  const copyMetric=pp=>{navigator.clipboard.writeText(`${pp.metric}${pp.value?': '+pp.value:''}`).then(()=>toast('Metric copied'));};
-
   const enhance=async id=>{
     const pp=proofPoints.find(x=>x.id===id);if(!pp)return;
     setEnhancing(true);
     try{const r=await callClaude('Senior capture manager at Astrion. Enhance proof points to be compelling, specific, quantified, proposal-ready.',
-      `Enhance this proof point:\nTitle: ${pp.title}\nMetric: ${pp.metric}\nValue: ${pp.value||''}\nContext: ${pp.context}\nDescription: ${pp.description||''}\nCategory: ${pp.category}\nSource Program: ${pp.sourceProgram||''}\n\nReturn JSON only: {"title":"...","metric":"...","narrative":"..."}`);
+      `Enhance this proof point:\nTitle: ${pp.title}\nMetric: ${pp.metric}\nContext: ${pp.context}\nCategory: ${pp.category}\n\nReturn JSON only: {"title":"...","metric":"...","narrative":"..."}`);
       try{const j=JSON.parse(r.replace(/```json|```/g,'').trim());upd(id,'enhanced',JSON.stringify(j));toast('Enhanced');}catch{upd(id,'enhanced',r);}
     }catch(e){toast('Enhancement failed','error');}
     setEnhancing(false);
   };
-
-  // Export / Import
-  const exportJSON=()=>{
-    const blob=new Blob([JSON.stringify({version:'1.0',exportedAt:new Date().toISOString(),proofPoints},null,2)],{type:'application/json'});
-    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`astrion-proof-points-${new Date().toISOString().slice(0,10)}.json`;a.click();toast('Exported');
-  };
-  const importJSON=e=>{
-    const file=e.target.files?.[0];if(!file)return;
-    const reader=new FileReader();
-    reader.onload=ev=>{
-      try{
-        const data=JSON.parse(ev.target.result);
-        const incoming=data.proofPoints||data;
-        if(!Array.isArray(incoming))throw new Error('Invalid');
-        let added=0;
-        const merged=[...proofPoints];
-        incoming.forEach(pp=>{if(!merged.find(p=>p.id===pp.id)){merged.push({...blank(),...pp,id:pp.id||Date.now()});added++;}});
-        setProofPoints(merged);
-        toast(`Imported ${added} proof points`);
-      }catch{toast('Invalid file format','error');}
-    };
-    reader.readAsText(file);
-    if(fileRef.current)fileRef.current.value='';
-  };
-
-  // Stats
-  const stats=useMemo(()=>({
-    total:proofPoints.length,
-    verified:proofPoints.filter(p=>p.verified).length,
-    starred:proofPoints.filter(p=>p.starred).length,
-    usages:proofPoints.reduce((s,p)=>s+(p.usageHistory||[]).length,0),
-    categories:[...new Set(proofPoints.map(p=>p.category))].length,
-  }),[proofPoints]);
-
-  // Filter & sort
-  const filtered=useMemo(()=>{
-    let list=[...proofPoints];
-    if(q){const lq=q.toLowerCase();list=list.filter(p=>[p.title,p.metric,p.value,p.description,p.sourceProgram,p.sourceAgency,...(p.tags||[])].some(f=>(f||'').toLowerCase().includes(lq)));}
-    if(filterCat!=='All')list=list.filter(p=>p.category===filterCat);
-    if(verifiedFilter==='Verified')list=list.filter(p=>p.verified);
-    if(verifiedFilter==='Unverified')list=list.filter(p=>!p.verified);
-    list.sort((a,b)=>{
-      if((a.starred||false)!==(b.starred||false))return(b.starred?1:0)-(a.starred?1:0);
-      let va=a[sortBy]||'',vb=b[sortBy]||'';
-      if(sortBy==='usageCount'){va=(a.usageHistory||[]).length;vb=(b.usageHistory||[]).length;}
-      if(typeof va==='string')return sortDir==='asc'?va.localeCompare(vb):vb.localeCompare(va);
-      return sortDir==='asc'?va-vb:vb-va;
-    });
-    return list;
-  },[proofPoints,q,filterCat,verifiedFilter,sortBy,sortDir]);
-
+  const cats=['All',...[...new Set(proofPoints.map(p=>p.category))]];
+  const filtered=proofPoints.filter(p=>(!q||(p.title+p.metric+p.category).toLowerCase().includes(q.toLowerCase()))&&(filterCat==='All'||p.category===filterCat));
   const cur=proofPoints.find(p=>p.id===sel);
   let eData=null;if(cur?.enhanced){try{eData=JSON.parse(cur.enhanced);}catch{}}
-  const fmtDate=d=>d?new Date(d+'T00:00').toLocaleDateString('en-US'):'—';
-
   return <div style={{display:'flex',height:'100%',overflow:'hidden'}}>
     {confirmDel&&<ConfirmModal message={`Delete "${proofPoints.find(p=>p.id===confirmDel)?.title||'this proof point'}"?`} onConfirm={()=>del(confirmDel)} onCancel={()=>setConfirmDel(null)}/>}
-    <input ref={fileRef} type="file" accept=".json" style={{display:'none'}} onChange={importJSON}/>
-
-    {/* ── LEFT SIDEBAR ── */}
-    <div style={{width:310,borderRight:`1px solid ${B.border}`,display:'flex',flexDirection:'column',flexShrink:0}}>
+    <div style={{width:300,borderRight:`1px solid ${B.border}`,display:'flex',flexDirection:'column',flexShrink:0}}>
       <div style={{padding:'14px 16px',borderBottom:`1px solid ${B.border}`}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
           <div style={{fontSize:14,fontWeight:700,color:'#F0F0FF'}}>Proof Points</div>
-          <div style={{display:'flex',gap:4}}>
-            <button style={{...S.btn('transparent'),border:`1px solid ${B.border}`,padding:'4px 8px',fontSize:10,color:B.silver}} onClick={exportJSON} title="Export JSON">↓</button>
-            <button style={{...S.btn('transparent'),border:`1px solid ${B.border}`,padding:'4px 8px',fontSize:10,color:B.silver}} onClick={()=>fileRef.current?.click()} title="Import JSON">↑</button>
-            <button style={{...S.btn(B.force),padding:'5px 12px',fontSize:11}} onClick={addPP}>+ Add</button>
-          </div>
+          <button style={{...S.btn(B.force),padding:'5px 12px',fontSize:11}} onClick={addPP}>+ Add</button>
         </div>
         <div style={{position:'relative',marginBottom:8}}>
           <span style={{position:'absolute',left:8,top:'50%',transform:'translateY(-50%)',fontSize:12,color:B.silver}}>🔍</span>
-          <input style={{...S.inp,fontSize:11,paddingLeft:26}} placeholder="Search metrics, titles, programs…" value={q} onChange={e=>setQ(e.target.value)}/>
+          <input style={{...S.inp,fontSize:11,paddingLeft:26}} placeholder="Search…" value={q} onChange={e=>setQ(e.target.value)}/>
         </div>
-        <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:6}}>
-          {['All',...PP_CATEGORIES.slice(0,5)].map(c=><button key={c} onClick={()=>setFilterCat(c)} style={{padding:'2px 8px',borderRadius:20,border:`1px solid ${filterCat===c?catColor(c):B.border}`,background:filterCat===c?(catColor(c))+'22':'transparent',color:filterCat===c?catColor(c):B.silver,fontSize:9,cursor:'pointer'}}>{c}</button>)}
-        </div>
-        <div style={{display:'flex',gap:4,alignItems:'center'}}>
-          <select style={{...S.inp,fontSize:9,padding:'3px 6px',flex:1}} value={verifiedFilter} onChange={e=>setVerifiedFilter(e.target.value)}>
-            <option value="All">All Status</option><option>Verified</option><option>Unverified</option>
-          </select>
-          <select style={{...S.inp,fontSize:9,padding:'3px 6px',flex:1}} value={sortBy} onChange={e=>setSortBy(e.target.value)}>
-            <option value="updatedAt">Last Updated</option><option value="createdAt">Created</option><option value="title">Title</option><option value="category">Category</option><option value="usageCount">Usage</option>
-          </select>
-          <button onClick={()=>setSortDir(d=>d==='asc'?'desc':'asc')} style={{...S.btn('transparent'),border:`1px solid ${B.border}`,padding:'3px 6px',fontSize:9,color:B.silver}}>{sortDir==='asc'?'↑':'↓'}</button>
+        <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+          {cats.slice(0,6).map(c=><button key={c} onClick={()=>setFilterCat(c)} style={{padding:'2px 8px',borderRadius:20,border:`1px solid ${filterCat===c?B.sky:B.border}`,background:filterCat===c?B.sky+'22':'transparent',color:filterCat===c?B.sky:B.silver,fontSize:9,cursor:'pointer'}}>{c}</button>)}
         </div>
       </div>
-
-      {/* ── STATS ── */}
-      <div style={{display:'flex',gap:0,borderBottom:`1px solid ${B.border}`}}>
-        {[{v:stats.total,l:'Total',c:B.sky},{v:stats.verified,l:'Verified',c:B.refraction},{v:stats.starred,l:'Starred',c:B.supernova},{v:stats.usages,l:'Used',c:B.force}].map(({v,l,c},i)=>
-          <div key={i} style={{flex:1,textAlign:'center',padding:'8px 4px',borderRight:i<3?`1px solid ${B.border}`:'none'}}>
-            <div className="mono" style={{fontSize:16,fontWeight:700,color:c}}>{v}</div>
-            <div style={{fontSize:8,color:B.silver,textTransform:'uppercase',letterSpacing:1}}>{l}</div>
-          </div>)}
-      </div>
-
-      {/* ── LIST ── */}
       <div style={{flex:1,overflowY:'auto',padding:'8px'}}>
-        {filtered.length===0&&<div style={{textAlign:'center',color:B.silver,fontSize:12,padding:24}}>No proof points match.</div>}
-        {filtered.map(pp=>{
-          const cc=catColor(pp.category);
-          return<div key={pp.id} onClick={()=>setSel(pp.id)} className="card-hover"
-            style={{padding:'10px 12px',borderRadius:8,cursor:'pointer',marginBottom:4,border:`1px solid ${sel===pp.id?cc:B.border}`,background:sel===pp.id?cc+'15':'transparent',transition:'all .12s',borderLeft:`3px solid ${cc}`}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:4,marginBottom:3}}>
-              <div style={{fontSize:11,fontWeight:700,color:'#E8E8F0',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{pp.starred?'★ ':''}{pp.title||'Untitled'}</div>
-              <div style={{display:'flex',gap:3,flexShrink:0}}>
-                {pp.verified&&<span style={{fontSize:8,padding:'1px 5px',borderRadius:8,background:B.refraction+'22',color:B.refraction,border:`1px solid ${B.refraction}44`}}>✓</span>}
-                {badge(pp.category,cc,true)}
-              </div>
-            </div>
-            <div style={{fontSize:10,color:B.sky,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontFamily:'JetBrains Mono,monospace'}}>{pp.metric||'No metric'}</div>
-            {pp.sourceProgram&&<div style={{fontSize:9,color:B.silver,marginTop:2}}>{pp.sourceProgram}</div>}
-            <div style={{display:'flex',gap:6,alignItems:'center',marginTop:2}}>
-              {(pp.usageHistory||[]).length>0&&<div style={{fontSize:9,color:B.sky}}>Used {pp.usageHistory.length}×</div>}
-              {reuse[pp.id]&&<ReuseBadge count={reuse[pp.id].count} oppNames={reuse[pp.id].opps}/>}
-            </div>
-            {(pp.tags||[]).length>0&&<div style={{display:'flex',gap:2,flexWrap:'wrap',marginTop:3}}>{pp.tags.slice(0,3).map(t=><span key={t} style={{fontSize:7,padding:'0px 4px',borderRadius:6,background:tagColor(t)+'22',color:tagColor(t),border:`1px solid ${tagColor(t)}33`}}>{t}</span>)}{pp.tags.length>3&&<span style={{fontSize:7,color:B.silver}}>+{pp.tags.length-3}</span>}</div>}
-          </div>;})}
+        {filtered.length===0&&<div style={{textAlign:'center',color:B.silver,fontSize:12,padding:24}}>No proof points yet.</div>}
+        {filtered.map(pp=><div key={pp.id} onClick={()=>setSel(pp.id)} className="card-hover"
+          style={{padding:'10px 12px',borderRadius:8,cursor:'pointer',marginBottom:4,border:`1px solid ${sel===pp.id?B.sky:B.border}`,background:sel===pp.id?B.sky+'15':'transparent',transition:'all .12s'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:4,marginBottom:3}}>
+            <div style={{fontSize:11,fontWeight:700,color:'#E8E8F0',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{pp.title||'Untitled'}</div>
+            {badge(pp.category,B.silver,true)}
+          </div>
+          <div style={{fontSize:10,color:B.silver,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{pp.metric||'No metric'}</div>
+          {pp.usageHistory?.length>0&&<div style={{fontSize:9,color:B.sky,marginTop:2}}>Used {pp.usageHistory.length}× in {[...new Set(pp.usageHistory.map(u=>u.docType))].length} doc types</div>}
+        </div>)}
       </div>
-      <div style={{padding:'10px 12px',borderTop:`1px solid ${B.border}`,fontSize:10,color:B.silver}}>{proofPoints.length} proof point{proofPoints.length!==1?'s':''} · {stats.categories} categories · {stats.verified} verified</div>
+      <div style={{padding:'10px 12px',borderTop:`1px solid ${B.border}`,fontSize:10,color:B.silver}}>{proofPoints.length} proof point{proofPoints.length!==1?'s':''} · {[...new Set(proofPoints.map(p=>p.category))].length} categories</div>
     </div>
-
-    {/* ── RIGHT PANEL ── */}
     <div style={{flex:1,overflowY:'auto',padding:'20px 24px'}}>
       {!cur&&<div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'60vh',gap:16}}>
         <div style={{fontSize:42}}>💡</div>
         <div style={{textAlign:'center'}}>
-          <div style={{fontSize:16,fontWeight:700,color:'#D0D0F0',marginBottom:6}}>Proof Point Library</div>
-          <div style={{fontSize:12,color:B.silver,marginBottom:6,lineHeight:1.7,maxWidth:420}}>Build a reusable evidence bank of quantified achievements — Shipley Feature → Benefit → Proof → Value methodology. Star your strongest, verify with sources, and pull them into any proposal.</div>
-          <div style={{display:'flex',gap:8,justifyContent:'center',marginTop:14}}>
-            <button style={{...S.btn(B.force),padding:'9px 22px'}} onClick={addPP}>+ Add First Proof Point</button>
-            <button style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver,padding:'9px 16px'}} onClick={()=>fileRef.current?.click()}>↑ Import JSON</button>
-          </div>
+          <div style={{fontSize:16,fontWeight:700,color:'#D0D0F0',marginBottom:6}}>Proof Points Library</div>
+          <div style={{fontSize:12,color:B.silver,marginBottom:18,lineHeight:1.7,maxWidth:400}}>Build a reusable bank of metrics and achievements for RFIs, proposals, white papers, capability statements, and relevance narratives.</div>
+          <button style={{...S.btn(B.force),padding:'9px 22px'}} onClick={addPP}>+ Add First Proof Point</button>
         </div>
       </div>}
       {cur&&<div style={{animation:'fadeIn .2s ease'}}>
-        {/* Header row */}
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:16}}>
           <div style={{flex:1,marginRight:12}}>
             <input style={{...S.inp,fontSize:16,fontWeight:700,background:'transparent',border:'none',padding:'0 0 4px',color:'#F0F0FF',width:'100%'}} value={cur.title} onChange={e=>upd(cur.id,'title',e.target.value)} placeholder="Proof Point Title"/>
-            <div style={{display:'flex',gap:6,alignItems:'center',marginTop:4}}>
-              {badge(cur.category,catColor(cur.category))}
-              <button onClick={()=>toggleStar(cur.id)} style={{background:'none',border:'none',cursor:'pointer',fontSize:16,color:cur.starred?B.supernova:B.silver,padding:0}} title="Star">{cur.starred?'★':'☆'}</button>
-              <button onClick={()=>toggleVerified(cur.id)} style={{padding:'2px 8px',borderRadius:12,border:`1px solid ${cur.verified?B.refraction:B.border}`,background:cur.verified?B.refraction+'22':'transparent',color:cur.verified?B.refraction:B.silver,fontSize:10,cursor:'pointer'}}>{cur.verified?'✓ Verified':'Mark Verified'}</button>
-            </div>
+            {badge(cur.category,B.sky)}
           </div>
-          <div style={{display:'flex',gap:6,flexShrink:0,flexWrap:'wrap'}}>
-            <button style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver,fontSize:11,padding:'5px 10px'}} onClick={()=>copyMetric(cur)} title="Copy metric">📋</button>
-            <button style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver,fontSize:11,padding:'5px 10px'}} onClick={()=>duplicatePP(cur)} title="Duplicate">⊕</button>
-            <button style={{...S.btn(enhancing?B.border:B.force),opacity:enhancing?0.6:1,fontSize:11,padding:'5px 14px'}} onClick={()=>enhance(cur.id)} disabled={enhancing}>{enhancing?<><span className="spinner"/> Enhancing…</>:'✦ AI Enhance'}</button>
+          <div style={{display:'flex',gap:8,flexShrink:0}}>
+            <button style={{...S.btn(enhancing?B.border:B.force),opacity:enhancing?0.6:1}} onClick={()=>enhance(cur.id)} disabled={enhancing}>{enhancing?<><span className="spinner"/> Enhancing…</>:'✦ AI Enhance'}</button>
             <button style={{...S.btn('transparent'),border:`1px solid ${B.twilight}44`,color:B.twilight,fontSize:11,padding:'5px 10px'}} onClick={()=>setConfirmDel(cur.id)}>🗑</button>
           </div>
         </div>
-
-        {/* Core data + Source info — 2 column */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
           <div style={S.card}>
-            <div style={S.hdg}>Core Evidence</div>
-            <div style={{marginBottom:10}}><span style={S.lbl}>Headline Metric</span><input className="mono" style={{...S.inp,fontWeight:700,color:catColor(cur.category),fontSize:14}} value={cur.metric||''} onChange={e=>upd(cur.id,'metric',e.target.value)} placeholder="e.g. 99.97% uptime over 36 months"/></div>
-            <div style={{marginBottom:10}}><span style={S.lbl}>Value / Quantified Result</span><input className="mono" style={{...S.inp,color:B.refraction}} value={cur.value||''} onChange={e=>upd(cur.id,'value',e.target.value)} placeholder="e.g. $4.2M saved annually"/></div>
+            <div style={S.hdg}>Core Data</div>
+            <div style={{marginBottom:10}}><span style={S.lbl}>Headline Metric</span><input className="mono" style={{...S.inp,fontWeight:700,color:B.sky,fontSize:14}} value={cur.metric||''} onChange={e=>upd(cur.id,'metric',e.target.value)} placeholder="e.g. 99.97% uptime over 36 months"/></div>
             <div style={{marginBottom:10}}><span style={S.lbl}>Category</span><select style={S.inp} value={cur.category} onChange={e=>upd(cur.id,'category',e.target.value)}>{PP_CATEGORIES.map(c=><option key={c}>{c}</option>)}</select></div>
-            <div><span style={S.lbl}>Description / Context</span><textarea style={ta} value={cur.description||cur.context||''} onChange={e=>{upd(cur.id,'description',e.target.value);upd(cur.id,'context',e.target.value);}} placeholder="Supporting narrative for this proof point…"/></div>
+            <div style={{marginBottom:10}}><span style={S.lbl}>Source / Attribution</span><input style={S.inp} value={cur.source||''} onChange={e=>upd(cur.id,'source',e.target.value)}/></div>
+            <div><span style={S.lbl}>Context &amp; Supporting Detail</span><textarea style={ta} value={cur.context||''} onChange={e=>upd(cur.id,'context',e.target.value)}/></div>
           </div>
           <div style={S.card}>
-            <div style={S.hdg}>Source &amp; Attribution</div>
-            <div style={{marginBottom:10}}><span style={S.lbl}>Source Program</span><input style={S.inp} value={cur.sourceProgram||cur.source||''} onChange={e=>{upd(cur.id,'sourceProgram',e.target.value);upd(cur.id,'source',e.target.value);}} placeholder="e.g. AMCOM Express TO-14"/></div>
-            <div style={{marginBottom:10}}><span style={S.lbl}>Source Agency</span><input style={S.inp} value={cur.sourceAgency||''} onChange={e=>upd(cur.id,'sourceAgency',e.target.value)} placeholder="e.g. U.S. Army AMCOM"/></div>
-            <div style={{marginBottom:10}}><span style={S.lbl}>Date Achieved</span><input style={S.inp} type="date" value={cur.dateAchieved||''} onChange={e=>upd(cur.id,'dateAchieved',e.target.value)}/></div>
             <div style={S.hdg}>Usage History</div>
-            {(cur.usageHistory||[]).length===0&&<div style={{color:B.silver,fontSize:12,padding:'8px 0'}}>Not used in any documents yet.</div>}
-            {(cur.usageHistory||[]).slice().reverse().slice(0,5).map((u,i)=><div key={i} style={{display:'flex',gap:8,padding:'5px 0',borderBottom:`1px solid ${B.border}`,alignItems:'center'}}>
+            {(cur.usageHistory||[]).length===0&&<div style={{color:B.silver,fontSize:12,padding:'16px 0'}}>Not used in any documents yet.</div>}
+            {(cur.usageHistory||[]).slice().reverse().map((u,i)=><div key={i} style={{display:'flex',gap:8,padding:'6px 0',borderBottom:`1px solid ${B.border}`,alignItems:'center'}}>
               <span style={{fontSize:13}}>{DOC_TYPES.find(d=>d.id===u.docType)?.icon||'📄'}</span>
               <div style={{flex:1}}><div style={{fontSize:11,fontWeight:600,color:'#E0E0F0'}}>{DOC_TYPES.find(d=>d.id===u.docType)?.label||u.docType}</div>{u.oppName&&<div style={{fontSize:10,color:B.silver}}>{u.oppName}</div>}</div>
               <div style={{fontSize:10,color:B.silver}}>{u.date?.slice(0,10)||''}</div>
             </div>)}
           </div>
         </div>
-
-        {/* AI Enhanced */}
-        {eData&&<div style={{...S.card,border:`1px solid ${catColor(cur.category)}44`}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div style={S.hdg}>AI-Enhanced Version</div>{badge('AI-Enhanced',catColor(cur.category))}</div>
+        {eData&&<div style={{...S.card,border:`1px solid ${B.sky}44`}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}><div style={S.hdg}>AI-Enhanced Version</div>{badge('AI-Enhanced',B.sky)}</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:10}}>
             <div><span style={S.lbl}>Enhanced Title</span><div style={{fontSize:13,color:'#E0E0F0',fontWeight:700,padding:'6px 0'}}>{eData.title}</div></div>
-            <div><span style={S.lbl}>Enhanced Metric</span><div className="mono" style={{fontSize:13,color:catColor(cur.category),fontWeight:700,padding:'6px 0'}}>{eData.metric}</div></div>
+            <div><span style={S.lbl}>Enhanced Metric</span><div className="mono" style={{fontSize:13,color:B.sky,fontWeight:700,padding:'6px 0'}}>{eData.metric}</div></div>
           </div>
-          {eData.narrative&&<><span style={S.lbl}>Proposal Narrative</span><div style={{background:'#181832',borderRadius:7,padding:'12px 14px',fontSize:13,color:'#C8C8E8',lineHeight:1.75}}>{eData.narrative}</div><button style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver,fontSize:11,padding:'5px 12px',marginTop:8}} onClick={()=>navigator.clipboard.writeText(eData.narrative).then(()=>toast('Copied!'))}>📋 Copy Narrative</button></>}
+          {eData.narrative&&<><span style={S.lbl}>Proposal Narrative</span><div style={{background:'#181832',borderRadius:7,padding:'12px 14px',fontSize:13,color:'#C8C8E8',lineHeight:1.75}}>{eData.narrative}</div><button style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver,fontSize:11,padding:'5px 12px',marginTop:8}} onClick={()=>navigator.clipboard.writeText(eData.narrative).then(()=>toast('Copied!'))}>📋 Copy</button></>}
         </div>}
-
-        {/* Linked PP, Tags, Files */}
         <div style={S.card}><div style={S.hdg}>Linked Past Performances</div><PastPerfPicker pastPerfs={pastPerfs} selectedIds={cur.pastPerfIds||[]} onToggle={id=>upd(cur.id,'pastPerfIds',(cur.pastPerfIds||[]).includes(id)?(cur.pastPerfIds||[]).filter(x=>x!==id):[...(cur.pastPerfIds||[]),id])}/></div>
         <div style={S.card}><div style={S.hdg}>Tags</div><TagEditor tags={cur.tags||[]} onChange={v=>upd(cur.id,'tags',v)}/></div>
         <div style={S.card}><div style={S.hdg}>Attached Files</div><FileList fileIds={cur.fileIds||[]} fileStore={fileStore} onAdd={f=>{addFiles(f);upd(cur.id,'fileIds',[...(cur.fileIds||[]),f.id]);}} onRemove={fid=>{removeFile(fid);upd(cur.id,'fileIds',(cur.fileIds||[]).filter(x=>x!==fid));}}/></div>
@@ -2492,119 +1811,103 @@ function ProofPointLibrary({proofPoints,setProofPoints,pastPerfs,opps,fileStore,
 
 /* ═══════════════════ DOCUMENT GENERATOR ═══════════════════ */
 function DocumentGenerator({opps,pastPerfs,proofPoints,setProofPoints,toast}){
-  const CONTENT_TYPES=[
-    {id:'capability',label:'Capability Paragraph',icon:'⭐',color:B.refraction,desc:'A focused paragraph on a specific capability area'},
-    {id:'relevance',label:'Relevance Statement',icon:'🎯',color:B.twilight,desc:'Why Astrion is uniquely qualified for this requirement'},
-    {id:'discriminator',label:'Discriminator',icon:'💎',color:B.force,desc:'A concise competitive advantage statement'},
-    {id:'ppnarrative',label:'PP Narrative',icon:'🏆',color:'#B066FF',desc:'Past performance narrative paragraph for a proposal'},
-    {id:'wintheme',label:'Win Theme Block',icon:'🏅',color:B.supernova,desc:'Win theme with Feature → Benefit → Proof structure'},
-    {id:'execsummary',label:'Executive Summary',icon:'📋',color:B.sky,desc:'Concise exec summary for a proposal section or response'},
-    {id:'elevator',label:'Elevator Pitch',icon:'🚀',color:'#66CCFF',desc:'30-second pitch for a specific opportunity or capability'},
-  ];
-  const [contentType,setContentType]=useState('capability');
+  const [docType,setDocType]=useState('capstat');
   const [selOpp,setSelOpp]=useState('');
   const [selPPs,setSelPPs]=useState([]);
   const [selPerfs,setSelPerfs]=useState([]);
   const [context,setContext]=useState('');
   const [audience,setAudience]=useState('');
-  const [wordTarget,setWordTarget]=useState(100);
+  const [wordTarget,setWordTarget]=useState(500);
   const [output,setOutput]=useState('');
   const [loading,setLoading]=useState(false);
   const [history,setHistory]=useState([]);
-  const ct=CONTENT_TYPES.find(d=>d.id===contentType);
+  const dt=DOC_TYPES.find(d=>d.id===docType);
   const opp=opps.find(o=>o.id===+selOpp);
   const selPPObjs=proofPoints.filter(p=>selPPs.includes(p.id));
   const selPerfObjs=pastPerfs.filter(p=>selPerfs.includes(p.id));
   const recordUsage=(ppIds,dt2,oppName)=>{const date=new Date().toISOString();setProofPoints(pps=>pps.map(pp=>ppIds.includes(pp.id)?{...pp,usageHistory:[...(pp.usageHistory||[]),{docType:dt2,oppName:oppName||'',date}]}:pp));};
   const generate=async()=>{
-    if(!context&&!opp&&!selPPObjs.length&&!selPerfObjs.length){toast('Add context, select an opportunity, or pick proof points/past performances');return;}
     setLoading(true);
-    const sys='Senior capture manager and proposal writer at Astrion Group, LLC. You write concise, compelling content using Shipley methodology. Active voice, mission-first, quantified claims. Never filler. Every sentence earns its place.';
-    const ppBlock=selPPObjs.length?'\nPROOF POINTS:\n'+selPPObjs.map(p=>'- '+p.title+': '+p.metric+(p.context?' ('+p.context+')':'')).join('\n'):'';
-    const perfBlock=selPerfObjs.length?'\nPAST PERFORMANCES:\n'+selPerfObjs.map(p=>'- '+p.name+' | '+p.agency+' | '+(p.value||'N/A')+' | '+p.role+' | CPARS: '+(p.cparRating||'N/A')+' | '+(p.keyAchievements||p.description||'')).join('\n'):'';
-    const oppBlock=opp?'\nOPPORTUNITY: '+opp.name+' | '+(opp.agency||'TBD')+' | '+(opp.tcv||'TBD')+' | '+opp.stage+(opp.tags?.length?' | Tags: '+opp.tags.join(', '):''):'';
-    const audienceStr=audience||'Government evaluator';
+    const sys='Senior proposal writer at Astrion. Shipley methodology, active voice, mission-first, quantified claims. Astrion EDGE™.';
+    const ppBlock=selPPObjs.length?`\nPROOF POINTS:\n${selPPObjs.map(p=>`- ${p.title}: ${p.metric}${p.context?' ('+p.context+')':''}`).join('\n')}`:'';;
+    const perfBlock=selPerfObjs.length?`\nPAST PERFORMANCES:\n${selPerfObjs.map(p=>`- ${p.name} | ${p.agency} | ${p.value} | ${p.role} | ${p.cparRating||'N/A'} | ${p.keyAchievements||p.description||''}`).join('\n')}`:'';;
+    const oppBlock=opp?`\nOPP: ${opp.name} | ${opp.agency||'TBD'} | ${opp.tcv||'TBD'} | ${opp.stage}`:'';
     const prompts={
-      capability:'Write a single focused capability paragraph (~'+wordTarget+' words). Audience: '+audienceStr+'.'+oppBlock+ppBlock+perfBlock+'\nFocus: '+(context||'Core Astrion capability')+'\nLead with what Astrion does, support with evidence, close with impact. Quantify everything possible.',
-      relevance:'Write a relevance statement (~'+wordTarget+' words). Audience: '+audienceStr+'.'+oppBlock+ppBlock+perfBlock+'\nRequirement: '+(context||'Federal services')+'\nDemonstrate direct alignment between Astrion experience and this specific requirement. Map past performance to current needs.',
-      discriminator:'Write a discriminator statement (~'+wordTarget+' words). Audience: '+audienceStr+'.'+oppBlock+ppBlock+perfBlock+'\nFocus: '+(context||'Competitive advantage')+'\nStructure: What we do differently → Why it matters → Proof it works. Be specific and quantified. Under 80 words if possible.',
-      ppnarrative:'Write a past performance narrative paragraph (~'+wordTarget+' words). Audience: '+audienceStr+'.'+oppBlock+ppBlock+perfBlock+'\nContext: '+(context||'Proposal past performance section')+'\nCover: contract overview, Astrion contributions with metrics, relevance to new requirement. Proposal-ready tone.',
-      wintheme:'Write a win theme block (~'+wordTarget+' words). Audience: '+audienceStr+'.'+oppBlock+ppBlock+perfBlock+'\nHot Button: '+(context||'Customer priority')+'\nStructure: Feature (what) → Benefit (so what) → Proof (prove it). Shipley methodology. Lead with customer benefit.',
-      execsummary:'Write an executive summary paragraph (~'+wordTarget+' words). Audience: '+audienceStr+'.'+oppBlock+ppBlock+perfBlock+'\nFocus: '+(context||'Proposal executive summary')+'\nHit: understanding of requirement, solution overview, why Astrion, key proof points. Compelling and concise.',
-      elevator:'Write a 30-second elevator pitch (~'+wordTarget+' words). Audience: '+audienceStr+'.'+oppBlock+ppBlock+perfBlock+'\nFocus: '+(context||'Astrion capability')+'\nConversational but authoritative. Lead with customer problem, Astrion solution, proof of results.',
+      rfi:`RFI Response (~${wordTarget} words). Audience: ${audience||'Contracting officer'}\n${ppBlock}${perfBlock}${oppBlock}\n${context||''}\nCover: company overview, capabilities, relevant experience, differentiators, call to action.`,
+      rfp:`Technical Approach for RFP (~${wordTarget} words). Audience: ${audience||'Source selection board'}\n${ppBlock}${perfBlock}${oppBlock}\n${context||''}\nCover: approach, methodology, discriminators, past performance relevance, management approach.`,
+      whitepaper:`White Paper (~${wordTarget} words). Topic: ${context||'Astrion technical capabilities'}\nAudience: ${audience||'Government decision-makers'}\n${ppBlock}${perfBlock}${oppBlock}\nCover: exec summary, problem, approach, evidence, recommendations, conclusion.`,
+      capstat:`Capability Statement (~${wordTarget} words). Focus: ${context||'Core competencies'}\nCustomer: ${audience||'Federal agencies'}\n${ppBlock}${perfBlock}${oppBlock}\nCover: overview, core competencies, differentiators with proof, past performance, contact placeholder.`,
+      relevance:`Relevance Narrative (~${wordTarget} words). Requirement: ${context||opp?.description||'Federal services'}\nCustomer: ${audience||opp?.agency||'Federal agency'}\n${ppBlock}${perfBlock}${oppBlock}\nDemonstrate why Astrion is uniquely relevant. Cite past performances, use proof points as evidence.`,
+      pastperf:`Past Performance Volume (~${wordTarget} words). Requirement: ${context||'Federal services'}\n${ppBlock}${perfBlock}${oppBlock}\nFor each PP: contract name/number, customer, period, value, scope, Astrion role, achievements, relevance, POC.`,
+      sources:`Sources Sought Response (~${wordTarget} words). Requirement: ${context||'Federal services'}\nAgency: ${audience||opp?.agency||'Federal agency'}\n${ppBlock}${perfBlock}${oppBlock}\nCover: company info, capability narrative, past performance summary, interest, questions for government.`,
     };
-    try{const r=await callClaude(sys,prompts[contentType]||prompts.capability);
-      if(!r||r.length<10)throw new Error('Empty');
-      setOutput(r);recordUsage(selPPs,contentType,opp?.name||'');
-      setHistory(h=>[{id:Date.now(),contentType,label:ct.label,oppName:opp?.name||'',date:new Date().toISOString(),content:r},...h.slice(0,19)]);
-      toast(ct.label+' generated');
-    }catch(e){
-      const hasKey=!!localStorage.getItem('edge_anthropic_key');
-      toast(hasKey?'Generation failed: '+(e.message||'check connection'):'No API key configured — go to Settings → General','error');
-    }
+    try{const r=await callClaude(sys,prompts[docType]||prompts.capstat);
+      setOutput(r);recordUsage(selPPs,docType,opp?.name||'');
+      setHistory(h=>[{id:Date.now(),docType,label:dt.label,oppName:opp?.name||'',date:new Date().toISOString(),content:r},...h.slice(0,9)]);
+      toast(`${dt.label} generated`);
+    }catch(e){toast('Generation failed','error');}
     setLoading(false);
   };
+  const dl=()=>{const b=new Blob([output],{type:'text/plain'});const url=URL.createObjectURL(b);const a=document.createElement('a');a.href=url;a.download=`${dt.label.replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.txt`;a.click();URL.revokeObjectURL(url);toast('Downloaded');};
   return <div style={{display:'flex',height:'100%',overflow:'hidden'}}>
-    <div style={{width:340,borderRight:'1px solid '+B.border,display:'flex',flexDirection:'column',overflowY:'auto'}}>
-      <div style={{padding:'16px',borderBottom:'1px solid '+B.border}}>
-        <div style={{fontSize:14,fontWeight:700,color:'#F0F0FF',marginBottom:4}}>Content Generator</div>
-        <div style={{fontSize:10,color:B.silver,marginBottom:14}}>Generate focused content blocks to work from — not full documents.</div>
-        <span style={S.lbl}>Content Type</span>
-        <div style={{display:'flex',flexDirection:'column',gap:4,marginBottom:14}}>
-          {CONTENT_TYPES.map(d=><button key={d.id} onClick={()=>setContentType(d.id)} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',borderRadius:8,border:'1px solid '+(contentType===d.id?d.color:B.border),background:contentType===d.id?d.color+'18':'transparent',cursor:'pointer',textAlign:'left',transition:'all .12s',fontFamily:"'DM Sans',sans-serif"}}>
-            <span style={{fontSize:14}}>{d.icon}</span>
-            <div><div style={{fontSize:11,fontWeight:700,color:contentType===d.id?d.color:'#9090B8'}}>{d.label}</div>
-            {contentType===d.id&&<div style={{fontSize:9,color:B.silver,marginTop:1}}>{d.desc}</div>}</div>
+    <div style={{width:340,borderRight:`1px solid ${B.border}`,display:'flex',flexDirection:'column',overflowY:'auto'}}>
+      <div style={{padding:'16px',borderBottom:`1px solid ${B.border}`}}>
+        <div style={{fontSize:14,fontWeight:700,color:'#F0F0FF',marginBottom:14}}>Document Generator</div>
+        <span style={S.lbl}>Document Type</span>
+        <div style={{display:'flex',flexDirection:'column',gap:5,marginBottom:14}}>
+          {DOC_TYPES.map(d=><button key={d.id} onClick={()=>setDocType(d.id)} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderRadius:8,border:`1px solid ${docType===d.id?d.color:B.border}`,background:docType===d.id?d.color+'18':'transparent',cursor:'pointer',textAlign:'left',transition:'all .12s',fontFamily:"'DM Sans',sans-serif"}}>
+            <span style={{fontSize:16}}>{d.icon}</span><span style={{fontSize:12,fontWeight:700,color:docType===d.id?d.color:'#9090B8'}}>{d.label}</span>
           </button>)}
         </div>
-        <div style={{marginBottom:10}}><span style={S.lbl}>Opportunity (optional)</span><select style={S.inp} value={selOpp} onChange={e=>setSelOpp(e.target.value)}><option value="">None</option>{opps.map(o=><option key={o.id} value={o.id}>{o.name||'Untitled'} — {o.agency}</option>)}</select></div>
-        <div style={{marginBottom:10}}><span style={S.lbl}>Audience</span><input style={S.inp} value={audience} onChange={e=>setAudience(e.target.value)} placeholder="e.g. Source selection board"/></div>
-        <div style={{marginBottom:10}}><span style={S.lbl}>Focus / Context</span><textarea style={{...ta,minHeight:50,fontSize:12}} value={context} onChange={e=>setContext(e.target.value)} placeholder="What should this content be about?"/></div>
-        <div style={{marginBottom:12}}>
+        <div style={{marginBottom:12}}><span style={S.lbl}>Opportunity (optional)</span><select style={S.inp} value={selOpp} onChange={e=>setSelOpp(e.target.value)}><option value="">None</option>{opps.map(o=><option key={o.id} value={o.id}>{o.name||'Untitled'} — {o.agency}</option>)}</select></div>
+        <div style={{marginBottom:12}}><span style={S.lbl}>Target Audience</span><input style={S.inp} value={audience} onChange={e=>setAudience(e.target.value)} placeholder="e.g. DISA Contracting Officer"/></div>
+        <div style={{marginBottom:12}}><span style={S.lbl}>Additional Context</span><textarea style={{...ta,minHeight:60,fontSize:12}} value={context} onChange={e=>setContext(e.target.value)} placeholder="Focus areas, specific requirements…"/></div>
+        <div style={{marginBottom:14}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:4}}>
             <span style={S.lbl}>Target Length</span><span className="mono" style={{fontSize:13,color:B.sky,fontWeight:700}}>{wordTarget} words</span>
           </div>
-          <input type="range" min={50} max={500} step={25} value={wordTarget} onChange={e=>setWordTarget(+e.target.value)}/>
-        </div>
-        <div style={{marginBottom:10,background:'#1A1A32',borderRadius:9,padding:'10px 12px'}}>
-          <ProofPointPicker proofPoints={proofPoints} selectedIds={selPPs} onToggle={id=>setSelPPs(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id])} label={'Proof Points ('+selPPs.length+' selected)'}/>
+          <input type="range" min={150} max={1500} step={50} value={wordTarget} onChange={e=>setWordTarget(+e.target.value)}/>
         </div>
         <div style={{marginBottom:12,background:'#1A1A32',borderRadius:9,padding:'10px 12px'}}>
-          <PastPerfPicker pastPerfs={pastPerfs} selectedIds={selPerfs} onToggle={id=>setSelPerfs(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id])} label={'Past Performances ('+selPerfs.length+' selected)'}/>
+          <ProofPointPicker proofPoints={proofPoints} selectedIds={selPPs} onToggle={id=>setSelPPs(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id])} label={`Proof Points (${selPPs.length} selected)`}/>
         </div>
-        <button style={{...S.btn(loading?B.border:ct.color),width:'100%',padding:'10px',fontSize:13,opacity:loading?.6:1}} onClick={generate} disabled={loading}>{loading?<><span className="spinner"/> Generating…</>:ct.icon+' Generate '+ct.label}</button>
+        <div style={{marginBottom:14,background:'#1A1A32',borderRadius:9,padding:'10px 12px'}}>
+          <PastPerfPicker pastPerfs={pastPerfs} selectedIds={selPerfs} onToggle={id=>setSelPerfs(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id])} label={`Past Performances (${selPerfs.length} selected)`}/>
+        </div>
+        <button style={{...S.btn(loading?B.border:dt.color),width:'100%',padding:'10px',fontSize:13,opacity:loading?0.6:1}} onClick={generate} disabled={loading}>{loading?<><span className="spinner"/> Generating…</>:`${dt.icon} Generate ${dt.label}`}</button>
       </div>
       {history.length>0&&<div style={{padding:'12px 16px'}}>
-        <div style={{...S.lbl,marginBottom:8}}>Recent ({history.length})</div>
-        {history.map(h=><div key={h.id} onClick={()=>setOutput(h.content)} style={{padding:'6px 10px',borderRadius:7,cursor:'pointer',marginBottom:3,border:'1px solid '+B.border,transition:'all .1s'}} onMouseEnter={e=>e.currentTarget.style.background='#1A1A32'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-          <div style={{fontSize:11,fontWeight:600,color:'#E0E0F0'}}>{CONTENT_TYPES.find(d=>d.id===h.contentType)?.icon||'📄'} {h.label}</div>
+        <div style={{...S.lbl,marginBottom:8}}>Recent</div>
+        {history.map(h=><div key={h.id} onClick={()=>setOutput(h.content)} style={{padding:'7px 10px',borderRadius:7,cursor:'pointer',marginBottom:4,border:`1px solid ${B.border}`,transition:'all .1s'}} onMouseEnter={e=>e.currentTarget.style.background='#1A1A32'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+          <div style={{fontSize:11,fontWeight:600,color:'#E0E0F0'}}>{DOC_TYPES.find(d=>d.id===h.docType)?.icon} {h.label}</div>
           {h.oppName&&<div style={{fontSize:10,color:B.silver}}>{h.oppName}</div>}
-          <div style={{fontSize:9,color:B.border}}>{h.date?.slice(0,10)}</div>
+          <div style={{fontSize:10,color:B.border}}>{h.date?.slice(0,10)}</div>
         </div>)}
       </div>}
     </div>
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
       {!output&&<div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:12,color:B.silver}}>
-        <div style={{fontSize:52}}>{ct.icon}</div>
-        <div style={{fontSize:17,fontWeight:700,color:'#D0D0F0'}}>{ct.label}</div>
-        <div style={{fontSize:12,color:B.silver,textAlign:'center',maxWidth:380,lineHeight:1.7}}>{ct.desc}. Add context, pick evidence, and generate.</div>
+        <div style={{fontSize:52}}>{dt.icon}</div>
+        <div style={{fontSize:17,fontWeight:700,color:'#D0D0F0'}}>{dt.label}</div>
+        <div style={{fontSize:12,color:B.silver,textAlign:'center',maxWidth:380,lineHeight:1.7}}>Select document type, choose proof points and past performances, then generate.</div>
       </div>}
       {output&&<>
-        <div style={{padding:'12px 20px',borderBottom:'1px solid '+B.border,display:'flex',justifyContent:'space-between',alignItems:'center',background:B.cardBg,flexShrink:0}}>
+        <div style={{padding:'12px 20px',borderBottom:`1px solid ${B.border}`,display:'flex',justifyContent:'space-between',alignItems:'center',background:B.cardBg,flexShrink:0}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <span style={{fontSize:20}}>{ct.icon}</span>
-            <div><div style={{fontSize:14,fontWeight:700,color:ct.color}}>{ct.label}</div>{opp&&<div style={{fontSize:11,color:B.silver}}>{opp.name}</div>}</div>
+            <span style={{fontSize:20}}>{dt.icon}</span>
+            <div><div style={{fontSize:14,fontWeight:700,color:dt.color}}>{dt.label}</div>{opp&&<div style={{fontSize:11,color:B.silver}}>{opp.name}</div>}</div>
+            {badge('AI-Generated',dt.color)}
           </div>
-          <div style={{display:'flex',gap:6}}>
-            <button style={{...S.btn('transparent'),border:'1px solid '+B.border,color:B.silver,fontSize:11,padding:'5px 12px'}} onClick={()=>navigator.clipboard.writeText(output).then(()=>toast('Copied'))}>📋 Copy</button>
-            <button style={{...S.btn('transparent'),border:'1px solid '+B.border,color:B.silver,fontSize:11,padding:'5px 12px'}} onClick={()=>{const b=new Blob([output],{type:'text/plain'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=ct.label.replace(/\s+/g,'-')+'-'+new Date().toISOString().slice(0,10)+'.txt';a.click();URL.revokeObjectURL(u);toast('Downloaded');}}>↓ .txt</button>
-            <button style={{...S.btn(ct.color),fontSize:11,padding:'5px 14px'}} onClick={generate} disabled={loading}>{loading?'…':'↻ Regen'}</button>
-            <button style={{...S.btn('transparent'),border:'1px solid '+B.border,color:B.twilight,fontSize:11,padding:'5px 12px'}} onClick={()=>setOutput('')}>✕ Clear</button>
+          <div style={{display:'flex',gap:8}}>
+            <button style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver,fontSize:11,padding:'5px 12px'}} onClick={()=>navigator.clipboard.writeText(output).then(()=>toast('Copied'))}>📋 Copy</button>
+            <button style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver,fontSize:11,padding:'5px 12px'}} onClick={dl}>↓ .txt</button>
+            <button style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver,fontSize:11,padding:'5px 12px'}} onClick={()=>{exportToPDF(output,dt.label,opp?opp.name+' · '+(opp.agency||''):'Astrion EDGE™');toast('PDF downloaded');}}>↓ PDF</button>
+            <button style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver,fontSize:11,padding:'5px 12px'}} onClick={()=>{exportToDoc(output,dt.label,opp?opp.name+' · '+(opp.agency||''):'Astrion EDGE™');toast('Word downloaded');}}>↓ Word</button>
+            <button style={{...S.btn(dt.color),fontSize:11,padding:'5px 14px'}} onClick={generate} disabled={loading}>{loading?'…':'↻ Regen'}</button>
           </div>
         </div>
         <div style={{flex:1,overflowY:'auto',padding:'20px 24px'}}>
-          <textarea style={{...ta,width:'100%',minHeight:'calc(100vh - 240px)',fontSize:14,lineHeight:1.9,color:'#D0D0E8',background:'transparent',border:'1px solid '+B.border,borderRadius:9,padding:'16px 20px',resize:'vertical'}} value={output} onChange={e=>setOutput(e.target.value)}/>
-          <div style={{fontSize:10,color:B.border,marginTop:8,textAlign:'right'}}>{output.split(/\s+/).filter(Boolean).length} words</div>
+          <textarea style={{...ta,minHeight:'calc(100vh - 220px)',fontSize:13,lineHeight:1.9,color:'#D0D0E8',background:'transparent',border:`1px solid ${B.border}`,borderRadius:9,padding:'16px 20px'}} value={output} onChange={e=>setOutput(e.target.value)}/>
         </div>
       </>}
     </div>
@@ -3256,53 +2559,7 @@ function PriceToWin({opp,onChange,globalCompetitors,toast}){
   </div>;
 }
 
-const GLOBAL_VIEWS=['portfolio','pastperfs','proofpoints','docgen','competitors','decisions','analytics','search','activity','settings'];
-
-/* ═══════════════════ ACTIVITY LOG VIEW ═══════════════════ */
-function ActivityLogView({activityLog,refresh,backendUp}){
-  useEffect(()=>{refresh();},[]);
-  const actionIcon=a=>({create:'🟢',update:'🔵',delete:'🔴',sync:'🔄',upload:'📎',import:'📥'}[a]||'●');
-  const actionColor=a=>({create:B.refraction,update:B.sky,delete:B.twilight,sync:B.supernova,upload:'#B066FF',import:B.force}[a]||B.silver);
-  const entityLabel=t=>({opp:'Opportunity',competitor:'Competitor',pastperf:'Past Performance',proofpoint:'Proof Point',blackhat:'Black Hat Session',file:'File',system:'System'}[t]||t);
-
-  if(!backendUp)return <div style={{padding:40,textAlign:'center'}}>
-    <div style={{fontSize:36,marginBottom:14,opacity:.3}}>📋</div>
-    <div style={{fontSize:15,fontWeight:700,color:'#D0D0F0',marginBottom:8}}>Activity Log Requires Backend</div>
-    <div style={{fontSize:12,color:B.silver,lineHeight:1.7,maxWidth:400,margin:'0 auto'}}>
-      The activity log is powered by the EDGE backend server. Start the backend with <code className="mono" style={{background:'#1E1E38',padding:'2px 6px',borderRadius:4,fontSize:11}}>npm start</code> to enable the full audit trail.
-    </div>
-  </div>;
-
-  return <div style={{flex:1,overflowY:'auto',padding:'18px 26px'}}>
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-      <div>
-        <div style={{fontSize:15,fontWeight:700,color:'#F0F0FF'}}>📋 Activity Log</div>
-        <div style={{fontSize:11,color:B.silver,marginTop:2}}>Backend audit trail · {activityLog.length} recent entries</div>
-      </div>
-      <button onClick={refresh} style={{...S.btn(B.force),padding:'6px 14px',fontSize:11}}>⟳ Refresh</button>
-    </div>
-    {activityLog.length===0?<div style={{...S.card,textAlign:'center',color:B.silver,padding:40}}>
-      <div style={{fontSize:28,marginBottom:8}}>📭</div>
-      <div>No activity logged yet. Actions in the tool are recorded here.</div>
-    </div>
-    :<div style={{display:'flex',flexDirection:'column',gap:2}}>
-      {activityLog.map((entry,i)=><div key={entry.id||i} style={{...S.card,marginBottom:0,display:'flex',gap:12,alignItems:'center',padding:'10px 16px'}}>
-        <div style={{width:32,height:32,borderRadius:'50%',background:actionColor(entry.action)+'22',border:`1px solid ${actionColor(entry.action)}44`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,flexShrink:0}}>{actionIcon(entry.action)}</div>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
-            {badge(entry.action,actionColor(entry.action),true)}
-            {badge(entityLabel(entry.entity_type),B.sky,true)}
-          </div>
-          {entry.detail&&<div style={{fontSize:11,color:'#C0C0E0',marginTop:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{entry.detail}</div>}
-        </div>
-        <div style={{fontSize:10,color:B.silver,flexShrink:0,textAlign:'right'}}>
-          <div className="mono" style={{fontSize:10}}>{entry.created_at?new Date(entry.created_at+'Z').toLocaleDateString():''}</div>
-          <div className="mono" style={{fontSize:9,color:B.border}}>{entry.created_at?new Date(entry.created_at+'Z').toLocaleTimeString():''}</div>
-        </div>
-      </div>)}
-    </div>}
-  </div>;
-}
+const GLOBAL_VIEWS=['portfolio','pastperfs','proofpoints','docgen','competitors','blackhats','analytics','search'];
 const OPP_NAV=[
   {id:'dashboard',  label:'Dashboard',    icon:'◈'},
   {id:'setup',      label:'Opportunity',  icon:'✎'},
@@ -3316,392 +2573,17 @@ const OPP_NAV=[
   {id:'pastperf',   label:'Past Perf',    icon:'🏆'},
   {id:'documents',  label:'Documents',    icon:'📁'},
   {id:'risks',      label:'Risks',        icon:'⚠'},
-  {id:'decisions',  label:'Decisions',    icon:'📝'},
   {id:'actions',    label:'Actions',      icon:'✓'},
 ];
 
-/* ═══════════════════ CROSS-OPPORTUNITY REUSE UTILITY ═══════════════════ */
-function useReuseCounts(opps,proofPoints,pastPerfs){
-  return useMemo(()=>{
-    const ppCounts={};const pastCounts={};
-    proofPoints.forEach(p=>{ppCounts[p.id]={count:0,opps:[]};});
-    pastPerfs.forEach(p=>{pastCounts[p.id]={count:0,opps:[]};});
-    opps.forEach(o=>{
-      (o.linkedPastPerfIds||[]).forEach(id=>{if(pastCounts[id]){pastCounts[id].count++;pastCounts[id].opps.push(o.name||'Untitled');}});
-      // proof points linked through solutioning, win themes, etc.
-      const ppIds=new Set();
-      (o.solutioning||[]).forEach(s=>(s.proofPointIds||[]).forEach(id=>ppIds.add(id)));
-      (o.winThemes||[]).forEach(t=>(t.proofPointIds||[]).forEach(id=>ppIds.add(id)));
-      ppIds.forEach(id=>{if(ppCounts[id]){ppCounts[id].count++;ppCounts[id].opps.push(o.name||'Untitled');}});
-    });
-    return{ppCounts,pastCounts};
-  },[opps,proofPoints,pastPerfs]);
-}
-
-function ReuseBadge({count,oppNames}){
-  const[show,setShow]=useState(false);
-  if(!count)return null;
-  return <span style={{position:'relative',display:'inline-block'}}>
-    <span onMouseEnter={()=>setShow(true)} onMouseLeave={()=>setShow(false)}
-      style={{fontSize:9,padding:'1px 6px',borderRadius:10,background:count>2?B.refraction+'33':B.sky+'22',color:count>2?B.refraction:B.sky,cursor:'default',whiteSpace:'nowrap'}}>
-      🔗 {count} opp{count!==1?'s':''}
-    </span>
-    {show&&oppNames.length>0&&<div style={{position:'absolute',bottom:'100%',left:0,background:'#1A1A3A',border:`1px solid ${B.border}`,borderRadius:8,padding:8,minWidth:140,zIndex:99,fontSize:10,color:'#D0D0E0',marginBottom:4,boxShadow:'0 4px 16px rgba(0,0,0,.5)'}}>
-      <div style={{fontWeight:700,marginBottom:4,color:B.sky,fontSize:9}}>Used in:</div>
-      {oppNames.map((n,i)=><div key={i} style={{padding:'2px 0'}}>{n}</div>)}
-    </div>}
-  </span>;
-}
-
-/* ═══════════════════ SETTINGS MODULE ═══════════════════ */
-function SettingsModule({toast}){
-  const [tab,setTab]=useState('taxonomy');
-  const [customKeyword,setCustomKeyword]=useState('');
-  const [customTag,setCustomTag]=useState(ALL_TAGS[0]||'');
-  const [customRules,setCustomRules]=useState(()=>{try{return JSON.parse(localStorage.getItem('edge_custom_tag_rules')||'{}');}catch{return{};}});
-  const [autoTagEnabled,setAutoTagEnabled]=useState(()=>{try{return JSON.parse(localStorage.getItem('edge_autotag_enabled')||'true');}catch{return true;}});
-  const [apiKey,setApiKey]=useState(()=>localStorage.getItem('edge_anthropic_key')||'');
-  const [showKey,setShowKey]=useState(false);
-
-  const saveCustomRules=(r)=>{setCustomRules(r);localStorage.setItem('edge_custom_tag_rules',JSON.stringify(r));};
-  const toggleAutoTag=(v)=>{setAutoTagEnabled(v);localStorage.setItem('edge_autotag_enabled',JSON.stringify(v));};
-
-  const addCustomRule=()=>{
-    const kw=customKeyword.trim().toLowerCase();
-    if(!kw){toast('Enter a keyword');return;}
-    const updated={...customRules,[kw]:[...(customRules[kw]||[]),customTag].filter((v,i,a)=>a.indexOf(v)===i)};
-    saveCustomRules(updated);setCustomKeyword('');toast(`Rule added: "${kw}" → ${customTag}`);
-  };
-  const removeCustomRule=(kw,tag)=>{
-    const updated={...customRules};
-    updated[kw]=(updated[kw]||[]).filter(t=>t!==tag);
-    if(!updated[kw].length)delete updated[kw];
-    saveCustomRules(updated);toast('Rule removed');
-  };
-
-  const tabs=[{id:'taxonomy',label:'Tag Taxonomy'},{id:'autorules',label:'Auto-Tag Rules'},{id:'general',label:'General'}];
-
-  return <div style={{flex:1,overflowY:'auto',padding:'18px 26px'}}>
-    <div style={{display:'flex',gap:4,marginBottom:16}}>
-      {tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{padding:'5px 14px',borderRadius:20,border:`1px solid ${tab===t.id?B.sky:B.border}`,background:tab===t.id?B.sky+'22':'transparent',color:tab===t.id?B.sky:B.silver,fontSize:11,fontWeight:tab===t.id?700:400,cursor:'pointer'}}>{t.label}</button>)}
-    </div>
-
-    {tab==='taxonomy'&&<div>
-      <div style={{fontSize:12,color:B.silver,marginBottom:14}}>Tags are organized into four tiers. Each proof point, past performance, or opportunity can be tagged across any combination of tiers for precise, faceted search and reuse tracking.</div>
-      {Object.entries(TAG_TIERS).map(([tier,{color,tags:tierTags}])=><div key={tier} style={{...S.card,borderLeft:`3px solid ${color}`,marginBottom:12}}>
-        <div style={{fontSize:13,fontWeight:700,color,marginBottom:8}}>{tier}</div>
-        <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
-          {tierTags.map(t=><span key={t}>{badge(t,color,true)}</span>)}
-        </div>
-        <div style={{fontSize:10,color:B.silver,marginTop:8}}>
-          {tier==='Mission / Domain'?'What the work is about — maps to customer requirements and Astrion capability areas':
-           tier==='Service / Work Type'?'The type of work being performed — critical for cross-opportunity reuse':
-           tier==='Differentiator'?'Why it matters — aligns to Shipley win themes and Section M evaluation criteria':
-           'Who the buyer is — enables agency-specific evidence retrieval'}
-        </div>
-      </div>)}
-    </div>}
-
-    {tab==='autorules'&&<div>
-      <div style={{...S.card,marginBottom:14}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-          <div style={{fontSize:13,fontWeight:700,color:'#F0F0FF'}}>Auto-Tag Engine</div>
-          <button onClick={()=>toggleAutoTag(!autoTagEnabled)} style={{...S.btn(autoTagEnabled?B.refraction:B.silver),fontSize:10,padding:'3px 12px'}}>
-            {autoTagEnabled?'✓ Enabled':'Disabled'}
-          </button>
-        </div>
-        <div style={{fontSize:11,color:B.silver}}>When enabled, the system scans text fields for keywords and suggests tags automatically. Suggestions must be confirmed — nothing is force-applied.</div>
-      </div>
-
-      <div style={{...S.card,marginBottom:14}}>
-        <div style={{fontSize:12,fontWeight:700,color:'#F0F0FF',marginBottom:8}}>Add Custom Rule</div>
-        <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
-          <input style={{...S.inp,flex:1,minWidth:120}} placeholder="Keyword (e.g., 'redstone')" value={customKeyword} onChange={e=>setCustomKeyword(e.target.value)}/>
-          <span style={{fontSize:11,color:B.silver}}>→</span>
-          <select style={{...S.inp,width:'auto'}} value={customTag} onChange={e=>setCustomTag(e.target.value)}>
-            {Object.entries(TAG_TIERS).map(([tier,{tags:tierTags}])=>
-              <optgroup key={tier} label={tier}>{tierTags.map(t=><option key={t} value={t}>{t}</option>)}</optgroup>
-            )}
-          </select>
-          <button onClick={addCustomRule} style={{...S.btn(B.sky),fontSize:10,padding:'4px 12px'}}>Add</button>
-        </div>
-      </div>
-
-      {Object.keys(customRules).length>0&&<div style={S.card}>
-        <div style={{fontSize:12,fontWeight:700,color:'#F0F0FF',marginBottom:8}}>Custom Rules ({Object.keys(customRules).length})</div>
-        {Object.entries(customRules).map(([kw,tags])=>tags.map(tag=>
-          <div key={kw+tag} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'4px 0',borderBottom:`1px solid ${B.border}22`}}>
-            <span style={{fontSize:11,color:'#D0D0E0'}}><code style={{background:'#1E1E38',padding:'1px 5px',borderRadius:4,fontSize:10}}>{kw}</code> → {badge(tag,tagColor(tag),true)}</span>
-            <button onClick={()=>removeCustomRule(kw,tag)} style={{background:'none',border:'none',color:B.twilight,fontSize:12,cursor:'pointer'}}>✕</button>
-          </div>
-        ))}
-      </div>}
-
-      <div style={{...S.card,marginTop:14}}>
-        <div style={{fontSize:12,fontWeight:700,color:'#F0F0FF',marginBottom:8}}>Built-in Rules ({Object.keys(TAG_RULES).length})</div>
-        <div style={{fontSize:10,color:B.silver,marginBottom:8}}>These rules are built into EDGE and cannot be edited. Custom rules above take priority.</div>
-        <div style={{maxHeight:200,overflowY:'auto'}}>
-          {Object.entries(TAG_RULES).slice(0,20).map(([kw,tags])=>
-            <div key={kw} style={{fontSize:10,color:'#8080AA',padding:'2px 0'}}><code style={{color:'#6060A0'}}>{kw}</code> → {tags.join(', ')}</div>
-          )}
-          <div style={{fontSize:10,color:B.silver,marginTop:4}}>…and {Object.keys(TAG_RULES).length-20} more</div>
-        </div>
-      </div>
-    </div>}
-
-    {tab==='general'&&<div>
-      <div style={S.card}>
-        <div style={{fontSize:13,fontWeight:700,color:'#F0F0FF',marginBottom:6}}>AI Configuration</div>
-        <div style={{fontSize:10,color:B.silver,marginBottom:10,lineHeight:1.6}}>
-          Required for Content Generator, AI-enhanced proof points, discriminators, and narrative generation. Get your key from <span style={{color:B.sky}}>console.anthropic.com</span>.
-        </div>
-        <div style={{display:'flex',gap:6,alignItems:'center'}}>
-          <input type={showKey?'text':'password'} style={{...S.inp,flex:1,fontFamily:'JetBrains Mono,monospace',fontSize:11}} value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="sk-ant-api03-..."/>
-          <button onClick={()=>setShowKey(!showKey)} style={{...S.btn('transparent'),border:'1px solid '+B.border,color:B.silver,fontSize:10,padding:'4px 8px'}}>{showKey?'Hide':'Show'}</button>
-          <button onClick={()=>{localStorage.setItem('edge_anthropic_key',apiKey);toast(apiKey?'API key saved':'API key cleared');}} style={{...S.btn(B.refraction),fontSize:10,padding:'4px 12px'}}>Save</button>
-        </div>
-        <div style={{fontSize:9,color:apiKey?B.refraction:B.supernova,marginTop:6}}>{apiKey?'✓ Key configured':'⚠ No key — AI features will not work'}</div>
-      </div>
-      <div style={{...S.card,marginTop:12}}>
-        <div style={{fontSize:13,fontWeight:700,color:'#F0F0FF',marginBottom:10}}>Data Management</div>
-        <div style={{fontSize:11,color:B.silver,lineHeight:1.6}}>
-          Use the Import/Export buttons in the top bar to manage your EDGE data. All data is stored locally in your browser and on the EDGE backend when connected.
-        </div>
-      </div>
-      <div style={{...S.card,marginTop:12}}>
-        <div style={{fontSize:13,fontWeight:700,color:'#F0F0FF',marginBottom:10}}>About EDGE™</div>
-        <div style={{fontSize:11,color:B.silver,lineHeight:1.6}}>
-          Astrion EDGE™ Capture Tool v5.7<br/>
-          Built on Shipley Associates methodology and Astrion BAP (Stages 0–5, Gates A–D).<br/>
-          Tiered tag taxonomy with {ALL_TAGS.length} tags across {Object.keys(TAG_TIERS).length} tiers.<br/>
-          {Object.keys(TAG_RULES).length} built-in auto-tag rules.
-        </div>
-      </div>
-    </div>}
-  </div>;
-}
-
-/* ═══════════════════ DECISION LOG ═══════════════════ */
-const DECISION_CATS=['Strategic','Technical','Pricing','Teaming','Staffing','Schedule','Contractual','Risk','Other'];
-const DECISION_CAT_COLORS={Strategic:B.force,Technical:B.sky,Pricing:B.supernova,Teaming:'#B066FF',Staffing:B.refraction,Schedule:'#66CCFF',Contractual:'#FF88AA',Risk:B.twilight,Other:B.silver};
-const DECISION_IMPACT=['High','Medium','Low'];
-
-function DecisionLog({decisions,setDecisions,opps,oppId=null,toast}){
-  const [adding,setAdding]=useState(false);
-  const [editId,setEditId]=useState(null);
-  const [catFilter,setCatFilter]=useState('All');
-  const [search,setSearch]=useState('');
-  const blank={id:Date.now(),date:new Date().toISOString().slice(0,10),title:'',decision:'',rationale:'',impact:'Medium',category:'Strategic',owner:'',oppId:oppId||'',status:'Active',tags:[]};
-  const [form,setForm]=useState(blank);
-
-  const filtered=useMemo(()=>{
-    let d=oppId?decisions.filter(x=>x.oppId===oppId):decisions;
-    if(catFilter!=='All')d=d.filter(x=>x.category===catFilter);
-    if(search){const s=search.toLowerCase();d=d.filter(x=>(x.title+x.decision+x.rationale+x.owner).toLowerCase().includes(s));}
-    return d.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  },[decisions,oppId,catFilter,search]);
-
-  const save=()=>{
-    if(!form.title.trim()){toast&&toast('Decision title required');return;}
-    if(editId){setDecisions(prev=>prev.map(d=>d.id===editId?{...form}:d));}
-    else{setDecisions(prev=>[...prev,{...form,id:Date.now()}]);}
-    setAdding(false);setEditId(null);setForm(blank);
-    toast&&toast(editId?'Decision updated':'Decision logged');
-  };
-  const del=id=>{setDecisions(prev=>prev.filter(d=>d.id!==id));toast&&toast('Decision removed');};
-  const startEdit=d=>{setForm({...d});setEditId(d.id);setAdding(true);};
-
-  const formUI=<div style={{...S.card,border:`1px solid ${B.force}44`,animation:'slideUp .15s ease'}}>
-    <div style={{display:'flex',gap:10,marginBottom:10}}>
-      <div style={{flex:1}}>
-        <label style={S.lbl}>Title</label>
-        <input style={S.inp} value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="e.g. Pursue as prime vs. sub"/>
-      </div>
-      <div style={{width:130}}>
-        <label style={S.lbl}>Date</label>
-        <input type="date" style={S.inp} value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/>
-      </div>
-    </div>
-    <div style={{display:'flex',gap:10,marginBottom:10}}>
-      <div style={{flex:1}}>
-        <label style={S.lbl}>Category</label>
-        <select style={S.inp} value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>
-          {DECISION_CATS.map(c=><option key={c}>{c}</option>)}
-        </select>
-      </div>
-      <div style={{flex:1}}>
-        <label style={S.lbl}>Impact</label>
-        <select style={S.inp} value={form.impact} onChange={e=>setForm({...form,impact:e.target.value})}>
-          {DECISION_IMPACT.map(i=><option key={i}>{i}</option>)}
-        </select>
-      </div>
-      <div style={{flex:1}}>
-        <label style={S.lbl}>Owner / Decision Maker</label>
-        <input style={S.inp} value={form.owner} onChange={e=>setForm({...form,owner:e.target.value})} placeholder="e.g. VP Capture"/>
-      </div>
-    </div>
-    {!oppId&&<div style={{marginBottom:10}}>
-      <label style={S.lbl}>Linked Opportunity (optional)</label>
-      <select style={S.inp} value={form.oppId} onChange={e=>setForm({...form,oppId:e.target.value})}>
-        <option value="">— Portfolio-level —</option>
-        {opps.map(o=><option key={o.id} value={o.id}>{o.name||'Untitled'}</option>)}
-      </select>
-    </div>}
-    <div style={{marginBottom:10}}>
-      <label style={S.lbl}>Decision</label>
-      <textarea style={ta} value={form.decision} onChange={e=>setForm({...form,decision:e.target.value})} placeholder="What was decided?"/>
-    </div>
-    <div style={{marginBottom:10}}>
-      <label style={S.lbl}>Rationale</label>
-      <textarea style={ta} value={form.rationale} onChange={e=>setForm({...form,rationale:e.target.value})} placeholder="Why? What factors drove this decision?"/>
-    </div>
-    <div style={{display:'flex',gap:10,marginBottom:10}}>
-      <div style={{flex:1}}>
-        <label style={S.lbl}>Status</label>
-        <select style={S.inp} value={form.status||'Active'} onChange={e=>setForm({...form,status:e.target.value})}>
-          <option>Active</option><option>Superseded</option><option>Revisit</option>
-        </select>
-      </div>
-    </div>
-    <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
-      <button onClick={()=>{setAdding(false);setEditId(null);setForm(blank);}} style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver}}>Cancel</button>
-      <button onClick={save} style={S.btn(B.force)}>{editId?'Update':'Log Decision'}</button>
-    </div>
-  </div>;
-
-  const statusColor=s=>s==='Active'?B.refraction:s==='Superseded'?B.silver:B.supernova;
-
-  return <div style={{flex:1,overflowY:'auto',padding:'18px 26px'}}>
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-      <div>
-        <div style={{fontSize:11,color:B.silver}}>{filtered.length} decision{filtered.length!==1?'s':''}{oppId?' on this opportunity':' across portfolio'}</div>
-      </div>
-      <div style={{display:'flex',gap:8}}>
-        <input style={{...S.inp,width:180,fontSize:11}} placeholder="Search decisions…" value={search} onChange={e=>setSearch(e.target.value)}/>
-        {!adding&&<button onClick={()=>{setForm({...blank,oppId:oppId||''});setAdding(true);setEditId(null);}} style={S.btn(B.force)}>+ Log Decision</button>}
-      </div>
-    </div>
-    <div style={{display:'flex',gap:5,marginBottom:14,flexWrap:'wrap'}}>
-      {['All',...DECISION_CATS].map(c=><button key={c} onClick={()=>setCatFilter(c)}
-        style={{...S.btn(catFilter===c?(DECISION_CAT_COLORS[c]||B.force):'transparent'),
-          border:`1px solid ${catFilter===c?'transparent':B.border}`,
-          color:catFilter===c?'#fff':(DECISION_CAT_COLORS[c]||B.silver),
-          padding:'3px 10px',fontSize:10}}>{c}</button>)}
-    </div>
-    {adding&&formUI}
-    {filtered.length===0&&!adding&&<div style={{...S.card,textAlign:'center',padding:40,color:B.silver}}>
-      <div style={{fontSize:32,marginBottom:8,opacity:.3}}>📝</div>
-      <div style={{fontSize:13,fontWeight:600}}>No decisions logged yet</div>
-      <div style={{fontSize:11,marginTop:4}}>Track key decisions, rationale, and outcomes as you prepare for gate reviews.</div>
-    </div>}
-    {filtered.map(d=>{
-      const oppName=d.oppId?opps.find(o=>String(o.id)===String(d.oppId))?.name:'';
-      return <div key={d.id} className="card-hover" style={{...S.card,display:'flex',gap:14,alignItems:'flex-start'}}>
-        <div style={{width:36,height:36,borderRadius:8,background:(DECISION_CAT_COLORS[d.category]||B.silver)+'18',border:`1px solid ${(DECISION_CAT_COLORS[d.category]||B.silver)}33`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,flexShrink:0}}>📝</div>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4,flexWrap:'wrap'}}>
-            <span style={{fontSize:13,fontWeight:700,color:'#E8E8FF'}}>{d.title}</span>
-            {badge(d.category,DECISION_CAT_COLORS[d.category]||B.silver,true)}
-            {badge(d.impact+' Impact',priorityC(d.impact),true)}
-            {badge(d.status||'Active',statusColor(d.status||'Active'),true)}
-          </div>
-          {d.decision&&<div style={{fontSize:12,color:'#C8C8E8',lineHeight:1.6,marginBottom:4}}><strong style={{color:B.sky}}>Decision:</strong> {d.decision}</div>}
-          {d.rationale&&<div style={{fontSize:11,color:'#9898B8',lineHeight:1.6,marginBottom:4}}><strong style={{color:B.supernova}}>Rationale:</strong> {d.rationale}</div>}
-          <div style={{display:'flex',gap:10,fontSize:10,color:B.silver,marginTop:4,alignItems:'center',flexWrap:'wrap'}}>
-            <span className="mono">{d.date}</span>
-            {d.owner&&<span>👤 {d.owner}</span>}
-            {oppName&&!oppId&&<span style={{color:B.sky}}>📌 {oppName}</span>}
-          </div>
-        </div>
-        <div style={{display:'flex',gap:4,flexShrink:0}}>
-          <button onClick={()=>startEdit(d)} style={{...S.btn('transparent'),border:`1px solid ${B.border}`,padding:'4px 8px',fontSize:10,color:B.silver}} title="Edit">✎</button>
-          <button onClick={()=>del(d.id)} style={{...S.btn('transparent'),border:`1px solid ${B.twilight}33`,padding:'4px 8px',fontSize:10,color:B.twilight}} title="Delete">×</button>
-        </div>
-      </div>;
-    })}
-  </div>;
-}
-
-/* ═══════════════════ TASK TRACKER SIDEBAR ═══════════════════ */
-function TaskTracker({opps,onOpenOpp,onChange}){
-  const [open,setOpen]=useState(true);
-  const [filter,setFilter]=useState('all'); // all, overdue, today, mine
-  const [ownerFilter,setOwnerFilter]=useState('');
-  const now=new Date();const todayStr=now.toISOString().slice(0,10);
-  const allTasks=[];
-  opps.forEach(o=>{(o.actions||[]).forEach(a=>{if(a.status!=='Complete')allTasks.push({...a,oppId:o.id,oppName:o.name||'Untitled'});});});
-  const overdue=allTasks.filter(t=>t.due&&t.due<todayStr);
-  const today=allTasks.filter(t=>t.due===todayStr);
-  const owners=[...new Set(allTasks.map(t=>t.owner).filter(Boolean))];
-  let visible=allTasks;
-  if(filter==='overdue')visible=overdue;
-  else if(filter==='today')visible=today;
-  if(ownerFilter)visible=visible.filter(t=>t.owner===ownerFilter);
-  visible.sort((a,b)=>{const p={High:0,Medium:1,Low:2};return(p[a.priority]||2)-(p[b.priority]||2);});
-  const toggle=(oppId,taskId)=>{const o=opps.find(x=>x.id===oppId);if(!o)return;onChange({...o,actions:(o.actions||[]).map(a=>a.id===taskId?{...a,status:'Complete'}:a)});};
-
-  if(!open)return <div onClick={()=>setOpen(true)} style={{width:36,background:B.sidebarBg,borderLeft:`1px solid ${B.border}`,cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:6,flexShrink:0}}>
-    <span style={{fontSize:14}}>✓</span>
-    <span style={{writingMode:'vertical-rl',fontSize:9,fontWeight:700,color:B.silver,letterSpacing:'.1em'}}>TASKS</span>
-    {allTasks.length>0&&<span style={{fontSize:9,background:B.twilight,color:'#fff',padding:'1px 5px',borderRadius:8,writingMode:'horizontal-tb'}}>{allTasks.length}</span>}
-  </div>;
-
-  return <div style={{width:260,background:B.sidebarBg,borderLeft:`1px solid ${B.border}`,display:'flex',flexDirection:'column',flexShrink:0,overflow:'hidden'}}>
-    <div style={{padding:'10px 12px',borderBottom:`1px solid ${B.border}`,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
-      <div style={{fontSize:11,fontWeight:800,color:'#E0E0F0',letterSpacing:'.04em'}}>✓ Task Tracker</div>
-      <button onClick={()=>setOpen(false)} style={{background:'transparent',border:'none',color:B.silver,cursor:'pointer',fontSize:14,padding:0}}>›</button>
-    </div>
-    {/* Stats */}
-    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:4,padding:'8px 10px',borderBottom:`1px solid ${B.border}`,flexShrink:0}}>
-      {[{l:'Open',v:allTasks.length,c:B.sky},{l:'Overdue',v:overdue.length,c:overdue.length>0?B.twilight:B.silver},{l:'Today',v:today.length,c:today.length>0?B.supernova:B.silver}].map(({l,v,c})=>
-        <div key={l} style={{textAlign:'center'}}>
-          <div className="mono" style={{fontSize:14,fontWeight:700,color:c}}>{v}</div>
-          <div style={{fontSize:8,color:B.silver,fontWeight:600}}>{l}</div>
-        </div>)}
-    </div>
-    {/* Filters */}
-    <div style={{padding:'6px 10px',borderBottom:`1px solid ${B.border}`,display:'flex',gap:4,flexWrap:'wrap',flexShrink:0}}>
-      {[['all','All'],['overdue','Overdue'],['today','Today']].map(([k,l])=>
-        <button key={k} onClick={()=>setFilter(k)} style={{...S.btn(filter===k?B.force:'transparent'),border:`1px solid ${filter===k?B.force:B.border}`,padding:'2px 8px',fontSize:9,color:filter===k?'#fff':B.silver}}>{l}</button>)}
-      {owners.length>1&&<select style={{...S.inp,width:'auto',padding:'2px 6px',fontSize:9,flex:1}} value={ownerFilter} onChange={e=>setOwnerFilter(e.target.value)}>
-        <option value="">All owners</option>
-        {owners.map(o=><option key={o} value={o}>{o}</option>)}
-      </select>}
-    </div>
-    {/* Task list */}
-    <div style={{flex:1,overflowY:'auto',padding:'6px 8px'}}>
-      {visible.length===0&&<div style={{textAlign:'center',padding:20,color:B.silver,fontSize:11}}>{filter==='overdue'?'No overdue tasks':'No tasks'}</div>}
-      {visible.map(t=>{const isOverdue=t.due&&t.due<todayStr;const pc=priorityC(t.priority);return<div key={t.id} style={{background:B.cardBg,border:`1px solid ${isOverdue?B.twilight+'44':B.border}`,borderRadius:7,padding:'7px 9px',marginBottom:4,borderLeft:`3px solid ${pc}`,cursor:'pointer'}} onClick={()=>onOpenOpp(t.oppId)}>
-        <div style={{display:'flex',alignItems:'flex-start',gap:6}}>
-          <div onClick={e=>{e.stopPropagation();toggle(t.oppId,t.id);}} style={{width:14,height:14,borderRadius:3,border:`2px solid ${B.border}`,cursor:'pointer',flexShrink:0,marginTop:1,display:'flex',alignItems:'center',justifyContent:'center',transition:'all .15s'}} onMouseEnter={e=>e.target.style.borderColor=B.refraction} onMouseLeave={e=>e.target.style.borderColor=B.border}/>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:11,fontWeight:600,color:'#E0E0F0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.task||'Untitled'}</div>
-            <div style={{display:'flex',gap:4,alignItems:'center',marginTop:2,flexWrap:'wrap'}}>
-              <span style={{fontSize:8,color:B.sky,fontWeight:600}}>{t.oppName.length>18?t.oppName.slice(0,18)+'…':t.oppName}</span>
-              {t.owner&&<span style={{fontSize:8,color:B.silver}}>· {t.owner}</span>}
-              {t.due&&<span style={{fontSize:8,color:isOverdue?B.twilight:B.silver}} className="mono">{t.due.slice(5)}</span>}
-              {isOverdue&&<span style={{fontSize:7,padding:'0 4px',borderRadius:4,background:B.twilight+'33',color:B.twilight,fontWeight:700}}>LATE</span>}
-            </div>
-          </div>
-        </div>
-      </div>;})}
-    </div>
-  </div>;
-}
-
 function App(){
-  // load via IndexedDB (see init effect below)
-  const [opps,setOpps]                         = useState([]);
-  const [pastPerfs,setPastPerfs]               = useState([]);
-  const [proofPoints,setProofPoints]           = useState([]);
-  const [fileStore,setFileStore]               = useState({});
-  const [globalCompetitors,setGlobalCompetitors] = useState([]);
-  const [blackHatSessions,setBlackHatSessions] = useState([]);
-  const [decisions,setDecisions]               = useState([]);
-  const [backendUp,setBackendUp]               = useState(null); // null=checking, true/false
-  const [backendStats,setBackendStats]         = useState(null);
-  const [activityLog,setActivityLog]           = useState([]);
-  const [loading,setLoading]                   = useState(true);
+  const load=key=>{try{return JSON.parse(localStorage.getItem(key)||'null');}catch{return null;}};
+  const [opps,setOpps]                         = useState(()=>load('astrion_opps')||[]);
+  const [pastPerfs,setPastPerfs]               = useState(()=>load('astrion_pastperfs')||[]);
+  const [proofPoints,setProofPoints]           = useState(()=>load('astrion_proofpoints')||[]);
+  const [fileStore,setFileStore]               = useState(()=>load('astrion_files')||{});
+  const [globalCompetitors,setGlobalCompetitors] = useState(()=>load('astrion_gcompetitors')||[]);
+  const [blackHatSessions,setBlackHatSessions] = useState(()=>load('astrion_blackhats')||[]);
   const [view,setView]                         = useState('portfolio');
   const [activeOppId,setActiveOppId]           = useState(null);
   const [activeModule,setModule]               = useState('dashboard');
@@ -3709,181 +2591,28 @@ function App(){
   const [confirmDel,setConfirmDel]             = useState(null);
   const {show:toast,TC}                        = useToast();
 
-  // ── BACKEND INIT: try API first, fallback to localStorage ──
-  useEffect(()=>{
-    (async()=>{
-      const up=await api.ping();
-      setBackendUp(up);
-      if(up){
-        try{
-          const [o,pp,pr,gc,bh,st,al]=await Promise.all([
-            api.get('/api/opportunities'),api.get('/api/past-performances'),
-            api.get('/api/proof-points'),api.get('/api/competitors'),
-            api.get('/api/black-hat-sessions'),api.get('/api/stats'),
-            api.get('/api/activity?limit=50'),
-          ]);
-          setOpps(o);setPastPerfs(pp);setProofPoints(pr);
-          setGlobalCompetitors(gc);setBlackHatSessions(bh);
-          setBackendStats(st);setActivityLog(al);
-        }catch(e){console.warn('API load partial fail:',e);setBackendUp(false);}
-      }
-      if(!up){
-        // IndexedDB with localStorage migration fallback
-        await EdgeDB.migrateFromLocalStorage();
-        const iLoad=async k=>(await EdgeDB.get(k))||[];
-        setOpps(await iLoad('astrion_opps'));setPastPerfs(await iLoad('astrion_pastperfs'));
-        setProofPoints(await iLoad('astrion_proofpoints'));setFileStore((await EdgeDB.get('astrion_files'))||{});
-        setGlobalCompetitors(await iLoad('astrion_gcompetitors'));setBlackHatSessions(await iLoad('astrion_blackhats'));
-        setDecisions(await iLoad('astrion_decisions'));
-      }
-      setLoading(false);
-    })();
-  },[]);
-
-  // ── PERSIST: save to appropriate backend ──
-  const persist=useCallback((key,val)=>{
-    if(!backendUp){EdgeDB.set(key,val).catch(()=>{try{localStorage.setItem(key,JSON.stringify(val));}catch{}});}
-  },[backendUp]);
-
-  useEffect(()=>{if(!loading)persist('astrion_opps',opps);},[opps,loading]);
-  useEffect(()=>{if(!loading)persist('astrion_pastperfs',pastPerfs);},[pastPerfs,loading]);
-  useEffect(()=>{if(!loading)persist('astrion_proofpoints',proofPoints);},[proofPoints,loading]);
-  useEffect(()=>{if(!loading)persist('astrion_files',fileStore);},[fileStore,loading]);
-  useEffect(()=>{if(!loading)persist('astrion_gcompetitors',globalCompetitors);},[globalCompetitors,loading]);
-  useEffect(()=>{if(!loading)persist('astrion_blackhats',blackHatSessions);},[blackHatSessions,loading]);
-  useEffect(()=>{if(!loading)persist('astrion_decisions',decisions);},[decisions,loading]);
-
-  // ── API-AWARE OPP MUTATIONS ──
-  const updOpp=u=>{
-    setOpps(p=>p.map(o=>o.id===u.id?u:o));
-    if(backendUp)api.put('/api/opportunities/'+u.id,u).catch(()=>{});
-  };
-  const delOpp=id=>{
-    setOpps(p=>p.filter(o=>o.id!==id));setActiveOppId(null);setView('portfolio');setConfirmDel(null);
-    if(backendUp)api.del('/api/opportunities/'+id).catch(()=>{});
-    toast('Opportunity deleted');
-  };
-  const saveNew=o=>{
-    setOpps(p=>[...p,o]);setShowNew(false);openOpp(o.id);
-    if(backendUp)api.post('/api/opportunities',o).catch(()=>{});
-    toast('Opportunity created');
-  };
-
-  // ── API-AWARE GLOBAL MUTATIONS ──
-  const setPastPerfsSync=fn=>{
-    setPastPerfs(prev=>{
-      const next=typeof fn==='function'?fn(prev):fn;
-      if(backendUp){
-        const added=next.filter(n=>!prev.find(p=>p.id===n.id));
-        const removed=prev.filter(p=>!next.find(n=>n.id===p.id));
-        const changed=next.filter(n=>{const p=prev.find(x=>x.id===n.id);return p&&JSON.stringify(p)!==JSON.stringify(n);});
-        added.forEach(a=>api.post('/api/past-performances',a).catch(()=>{}));
-        removed.forEach(r=>api.del('/api/past-performances/'+r.id).catch(()=>{}));
-        changed.forEach(c=>api.put('/api/past-performances/'+c.id,c).catch(()=>{}));
-      }
-      return next;
-    });
-  };
-  const setProofPointsSync=fn=>{
-    setProofPoints(prev=>{
-      const next=typeof fn==='function'?fn(prev):fn;
-      if(backendUp){
-        const added=next.filter(n=>!prev.find(p=>p.id===n.id));
-        const removed=prev.filter(p=>!next.find(n=>n.id===p.id));
-        const changed=next.filter(n=>{const p=prev.find(x=>x.id===n.id);return p&&JSON.stringify(p)!==JSON.stringify(n);});
-        added.forEach(a=>api.post('/api/proof-points',a).catch(()=>{}));
-        removed.forEach(r=>api.del('/api/proof-points/'+r.id).catch(()=>{}));
-        changed.forEach(c=>api.put('/api/proof-points/'+c.id,c).catch(()=>{}));
-      }
-      return next;
-    });
-  };
-  const setGlobalCompetitorsSync=fn=>{
-    setGlobalCompetitors(prev=>{
-      const next=typeof fn==='function'?fn(prev):fn;
-      if(backendUp){
-        const added=next.filter(n=>!prev.find(p=>p.id===n.id));
-        const removed=prev.filter(p=>!next.find(n=>n.id===p.id));
-        const changed=next.filter(n=>{const p=prev.find(x=>x.id===n.id);return p&&JSON.stringify(p)!==JSON.stringify(n);});
-        added.forEach(a=>api.post('/api/competitors',a).catch(()=>{}));
-        removed.forEach(r=>api.del('/api/competitors/'+r.id).catch(()=>{}));
-        changed.forEach(c=>api.put('/api/competitors/'+c.id,c).catch(()=>{}));
-      }
-      return next;
-    });
-  };
-  const setBlackHatSessionsSync=fn=>{
-    setBlackHatSessions(prev=>{
-      const next=typeof fn==='function'?fn(prev):fn;
-      if(backendUp){
-        const added=next.filter(n=>!prev.find(p=>p.id===n.id));
-        const removed=prev.filter(p=>!next.find(n=>n.id===p.id));
-        const changed=next.filter(n=>{const p=prev.find(x=>x.id===n.id);return p&&JSON.stringify(p)!==JSON.stringify(n);});
-        added.forEach(a=>api.post('/api/black-hat-sessions',a).catch(()=>{}));
-        removed.forEach(r=>api.del('/api/black-hat-sessions/'+r.id).catch(()=>{}));
-        changed.forEach(c=>api.put('/api/black-hat-sessions/'+c.id,c).catch(()=>{}));
-      }
-      return next;
-    });
-  };
+  useEffect(()=>{try{localStorage.setItem('astrion_opps',JSON.stringify(opps));}catch{}},[opps]);
+  useEffect(()=>{try{localStorage.setItem('astrion_pastperfs',JSON.stringify(pastPerfs));}catch{}},[pastPerfs]);
+  useEffect(()=>{try{localStorage.setItem('astrion_proofpoints',JSON.stringify(proofPoints));}catch{}},[proofPoints]);
+  useEffect(()=>{try{localStorage.setItem('astrion_files',JSON.stringify(fileStore));}catch{}},[fileStore]);
+  useEffect(()=>{try{localStorage.setItem('astrion_gcompetitors',JSON.stringify(globalCompetitors));}catch{}},[globalCompetitors]);
+  useEffect(()=>{try{localStorage.setItem('astrion_blackhats',JSON.stringify(blackHatSessions));}catch{}},[blackHatSessions]);
 
   const addFiles=f=>{if(!f)return;setFileStore(s=>({...s,[f.id]:f}));};
-  const removeFile=id=>{
-    setFileStore(s=>{const n={...s};delete n[id];return n;});
-    if(backendUp)api.del('/api/files/'+id).catch(()=>{});
-  };
+  const removeFile=id=>setFileStore(s=>{const n={...s};delete n[id];return n;});
 
   const opp=opps.find(o=>o.id===activeOppId);
+  const updOpp=u=>setOpps(p=>p.map(o=>o.id===u.id?u:o));
+  const delOpp=id=>{setOpps(p=>p.filter(o=>o.id!==id));setActiveOppId(null);setView('portfolio');setConfirmDel(null);toast('Opportunity deleted');};
   const openOpp=id=>{setActiveOppId(id);setModule('dashboard');setView('opp');};
-
-  const exportAll=async()=>{
-    let data;
-    if(backendUp){
-      try{data=await api.get('/api/export');}catch{data={opps,pastPerfs,proofPoints,globalCompetitors,blackHatSessions};}
-    }else{data={opps,pastPerfs,proofPoints,globalCompetitors,blackHatSessions,decisions};}
-    const b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const saveNew=o=>{setOpps(p=>[...p,o]);setShowNew(false);openOpp(o.id);toast('Opportunity created');};
+  const exportAll=()=>{
+    const data=JSON.stringify({opps,pastPerfs,proofPoints,globalCompetitors,blackHatSessions},null,2);
+    const b=new Blob([data],{type:'application/json'});
     const url=URL.createObjectURL(b);
     const a=document.createElement('a');a.href=url;a.download=`astrion-capture-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url);toast('Exported');
   };
-  const importAll=async(data)=>{
-    if(backendUp){
-      try{await api.post('/api/import',data);
-        const [o,pp,pr,gc,bh]=await Promise.all([api.get('/api/opportunities'),api.get('/api/past-performances'),api.get('/api/proof-points'),api.get('/api/competitors'),api.get('/api/black-hat-sessions')]);
-        setOpps(o);setPastPerfs(pp);setProofPoints(pr);setGlobalCompetitors(gc);setBlackHatSessions(bh);
-      }catch{if(data.opps)setOpps(data.opps);if(data.pastPerfs)setPastPerfs(data.pastPerfs);if(data.proofPoints)setProofPoints(data.proofPoints);if(data.globalCompetitors)setGlobalCompetitors(data.globalCompetitors);if(data.blackHatSessions)setBlackHatSessions(data.blackHatSessions);if(data.decisions)setDecisions(data.decisions);}
-    }else{if(data.opps)setOpps(data.opps);if(data.pastPerfs)setPastPerfs(data.pastPerfs);if(data.proofPoints)setProofPoints(data.proofPoints);if(data.globalCompetitors)setGlobalCompetitors(data.globalCompetitors);if(data.blackHatSessions)setBlackHatSessions(data.blackHatSessions);if(data.decisions)setDecisions(data.decisions);}
-  };
-
-  // ── REFRESH ACTIVITY LOG ──
-  const refreshActivity=useCallback(()=>{if(backendUp)api.get('/api/activity?limit=50').then(setActivityLog).catch(()=>{});},[backendUp]);
-
-  // ── RECONNECT ──
-  const reconnect=useCallback(async()=>{
-    setBackendUp(null);
-    const up=await api.ping();
-    setBackendUp(up);
-    if(up){
-      try{
-        const [o,pp,pr,gc,bh]=await Promise.all([
-          api.get('/api/opportunities'),api.get('/api/past-performances'),
-          api.get('/api/proof-points'),api.get('/api/competitors'),
-          api.get('/api/black-hat-sessions'),
-        ]);
-        setOpps(o);setPastPerfs(pp);setProofPoints(pr);
-        setGlobalCompetitors(gc);setBlackHatSessions(bh);
-        toast('Connected to backend');
-      }catch{setBackendUp(false);toast('Backend connection failed','error');}
-    }else{toast('Backend not reachable','warn');}
-  },[]);
-
-  // ── PERIODIC HEALTH CHECK (every 30s) ──
-  useEffect(()=>{
-    const iv=setInterval(async()=>{
-      const up=await api.ping();
-      setBackendUp(prev=>{if(prev!==up&&up)toast('Backend reconnected');return up;});
-    },30000);
-    return()=>clearInterval(iv);
-  },[]);
+  const importAll=data=>{if(data.opps)setOpps(data.opps);if(data.pastPerfs)setPastPerfs(data.pastPerfs);if(data.proofPoints)setProofPoints(data.proofPoints);if(data.globalCompetitors)setGlobalCompetitors(data.globalCompetitors);if(data.blackHatSessions)setBlackHatSessions(data.blackHatSessions);};
 
   const openActs=opp?opp.actions.filter(a=>a.status!=='Complete').length:0;
   const activeRisk=opp?opp.risks.filter(r=>r.status==='Active').length:0;
@@ -3905,28 +2634,21 @@ function App(){
     pastperf:    <OppPastPerf opp={opp} onChange={updOpp} pastPerfs={pastPerfs} proofPoints={proofPoints}/>,
     documents:   <OppDocuments opp={opp} onChange={updOpp} toast={toast}/>,
     risks:       <Risks opp={opp} onChange={updOpp}/>,
-    decisions:   <DecisionLog decisions={decisions} setDecisions={setDecisions} opps={opps} oppId={opp.id} toast={toast}/>,
     actions:     <ActionItems opp={opp} onChange={updOpp}/>,
   }:{};
 
   const GLOBAL_MODS={
-    pastperfs:   <PastPerfLibrary pastPerfs={pastPerfs} setPastPerfs={setPastPerfsSync} proofPoints={proofPoints} opps={opps} fileStore={fileStore} addFiles={addFiles} removeFile={removeFile} toast={toast}/>,
-    proofpoints: <ProofPointLibrary proofPoints={proofPoints} setProofPoints={setProofPointsSync} pastPerfs={pastPerfs} opps={opps} fileStore={fileStore} addFiles={addFiles} removeFile={removeFile} toast={toast}/>,
-    docgen:      <DocumentGenerator opps={opps} pastPerfs={pastPerfs} proofPoints={proofPoints} setProofPoints={setProofPointsSync} toast={toast}/>,
-    competitors: <CompetitorLibrary globalCompetitors={globalCompetitors} setGlobalCompetitors={setGlobalCompetitorsSync} blackHatSessions={blackHatSessions} opps={opps} fileStore={fileStore} addFiles={addFiles} removeFile={removeFile} toast={toast}/>,
-    decisions:   <DecisionLog decisions={decisions} setDecisions={setDecisions} opps={opps} toast={toast}/>,
+    pastperfs:   <PastPerfLibrary pastPerfs={pastPerfs} setPastPerfs={setPastPerfs} proofPoints={proofPoints} fileStore={fileStore} addFiles={addFiles} removeFile={removeFile} toast={toast}/>,
+    proofpoints: <ProofPointLibrary proofPoints={proofPoints} setProofPoints={setProofPoints} pastPerfs={pastPerfs} fileStore={fileStore} addFiles={addFiles} removeFile={removeFile} toast={toast}/>,
+    docgen:      <DocumentGenerator opps={opps} pastPerfs={pastPerfs} proofPoints={proofPoints} setProofPoints={setProofPoints} toast={toast}/>,
+    competitors: <CompetitorLibrary globalCompetitors={globalCompetitors} setGlobalCompetitors={setGlobalCompetitors} blackHatSessions={blackHatSessions} opps={opps} fileStore={fileStore} addFiles={addFiles} removeFile={removeFile} toast={toast}/>,
+    blackhats:   <BlackHatCenter blackHatSessions={blackHatSessions} setBlackHatSessions={setBlackHatSessions} globalCompetitors={globalCompetitors} setGlobalCompetitors={setGlobalCompetitors} opps={opps} setOpps={setOpps} fileStore={fileStore} addFiles={addFiles} removeFile={removeFile} toast={toast}/>,
     analytics:   <AnalyticsDashboard opps={opps} pastPerfs={pastPerfs} proofPoints={proofPoints} globalCompetitors={globalCompetitors}/>,
     search:      <GlobalSearch opps={opps} pastPerfs={pastPerfs} proofPoints={proofPoints} globalCompetitors={globalCompetitors} onOpenOpp={openOpp}/>,
-    activity:    <ActivityLogView activityLog={activityLog} refresh={refreshActivity} backendUp={backendUp}/>,
-    settings:    <SettingsModule toast={toast}/>,
   };
 
   return <div style={{display:'flex',height:'100vh',background:B.darkBg,overflow:'hidden'}}>
     <TC/>
-    {loading&&<div style={{position:'fixed',inset:0,background:B.darkBg,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:9998,gap:16}}>
-      <div style={{width:48,height:48,borderRadius:12,background:`linear-gradient(135deg,${B.force},${B.sky})`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,fontWeight:900,color:'#fff',boxShadow:`0 4px 20px ${B.force}88`}}>A</div>
-      <div style={{display:'flex',alignItems:'center',gap:8}}><span className="spinner"/><span style={{fontSize:13,color:B.silver}}>Connecting to EDGE backend…</span></div>
-    </div>}
     {showNew&&<NewOppModal onSave={saveNew} onCancel={()=>setShowNew(false)}/>}
     {confirmDel&&<ConfirmModal message={`Delete "${opps.find(o=>o.id===confirmDel)?.name||'this opportunity'}"? This cannot be undone.`} onConfirm={()=>delOpp(confirmDel)} onCancel={()=>setConfirmDel(null)}/>}
 
@@ -3935,7 +2657,7 @@ function App(){
       <div style={{padding:'15px 14px 13px',borderBottom:`1px solid ${B.border}`,flexShrink:0}}>
         <div style={{display:'flex',alignItems:'center',gap:9}}>
           <div style={{width:34,height:34,borderRadius:8,background:`linear-gradient(135deg,${B.force},${B.sky})`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:900,color:'#fff',boxShadow:`0 3px 12px ${B.force}66`,flexShrink:0}}>A</div>
-          <div><div style={{fontSize:12,fontWeight:800,color:'#fff',letterSpacing:'.06em'}}>ASTRION</div><div style={{fontSize:8,color:B.sky,letterSpacing:'.14em',fontWeight:700}}>EDGE™ CAPTURE v5.7</div></div>
+          <div><div style={{fontSize:12,fontWeight:800,color:'#fff',letterSpacing:'.06em'}}>ASTRION</div><div style={{fontSize:8,color:B.sky,letterSpacing:'.14em',fontWeight:700}}>EDGE™ CAPTURE v5</div></div>
         </div>
       </div>
       <div style={{flex:1,overflowY:'auto',padding:'8px'}}>
@@ -3943,12 +2665,9 @@ function App(){
           {id:'portfolio',    label:'Portfolio',          icon:'◈', count:opps.length},
           {id:'pastperfs',    label:'Past Performances',  icon:'🏆', count:pastPerfs.length},
           {id:'proofpoints',  label:'Proof Points',       icon:'💡', count:proofPoints.length},
-          {id:'docgen',       label:'Content Generator',  icon:'📄', count:null},
+          {id:'docgen',       label:'Doc Generator',      icon:'📄', count:null},
           {id:'analytics',    label:'Analytics',          icon:'📊', count:null},
-          {id:'decisions',    label:'Decision Log',       icon:'📝', count:decisions.length||null},
           {id:'search',       label:'Search',             icon:'🔍', count:null},
-          {id:'activity',     label:'Activity Log',       icon:'📋', count:null},
-          {id:'settings',     label:'Settings',            icon:'⚙', count:null},
         ].map(n=>{
           const active=(view===n.id||(!opp&&view==='portfolio'&&n.id==='portfolio'))&&!opp;
           const realActive=n.id==='portfolio'?!opp&&view==='portfolio':!opp&&view===n.id;
@@ -3963,6 +2682,7 @@ function App(){
         <div style={{padding:'2px 10px 4px'}}><div style={{fontSize:8,color:'#30306A',letterSpacing:'.12em',fontWeight:700,textTransform:'uppercase'}}>Competitive Intel</div></div>
         {[
           {id:'competitors', label:'Competitor Library', icon:'⚔', count:globalCompetitors.length},
+          {id:'blackhats',   label:'Black Hat Center',   icon:'🎯', count:blackHatSessions.length},
         ].map(n=>{
           const realActive=!opp&&view===n.id;
           return <button key={n.id} className="nav-btn" onClick={()=>{setActiveOppId(null);setView(n.id);}}
@@ -3991,7 +2711,6 @@ function App(){
               <span style={{flex:1}}>{n.label}</span>
               {n.id==='actions'&&openActs>0&&<span style={{fontSize:9,background:B.twilight,color:'#fff',padding:'1px 5px',borderRadius:8}}>{openActs}</span>}
               {n.id==='risks'&&activeRisk>0&&<span style={{fontSize:9,background:B.supernova,color:'#0C0C18',padding:'1px 5px',borderRadius:8}}>{activeRisk}</span>}
-              {n.id==='decisions'&&decisions.filter(d=>String(d.oppId)===String(opp.id)).length>0&&<span style={{fontSize:9,background:B.force,color:'#fff',padding:'1px 5px',borderRadius:8}}>{decisions.filter(d=>String(d.oppId)===String(opp.id)).length}</span>}
               {n.id==='pastperf'&&linkedPerfs>0&&<span style={{fontSize:9,background:'#B066FF',color:'#fff',padding:'1px 5px',borderRadius:8}}>{linkedPerfs}</span>}
               {n.id==='documents'&&oppDocs>0&&<span style={{fontSize:9,background:B.sky,color:'#0C0C18',padding:'1px 5px',borderRadius:8}}>{oppDocs}</span>}
             </button>;
@@ -4002,14 +2721,7 @@ function App(){
         </>}
       </div>
       <div style={{padding:'10px 14px',borderTop:`1px solid ${B.border}`,flexShrink:0}}>
-        <div style={{fontSize:9,color:'#22224A',lineHeight:1.7}}>
-          <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:3}}>
-            <div style={{width:6,height:6,borderRadius:'50%',background:backendUp===null?B.supernova:backendUp?B.refraction:'#555',boxShadow:backendUp?`0 0 6px ${B.refraction}88`:backendUp===null?`0 0 6px ${B.supernova}88`:'none',flexShrink:0,animation:backendUp===null?'pulse 1.2s infinite':'none'}}/>
-            <span style={{color:backendUp?B.refraction:backendUp===null?B.supernova:'#555',fontWeight:600,fontSize:8,letterSpacing:'.04em',flex:1}}>{backendUp===null?'CONNECTING…':backendUp?'BACKEND ONLINE':'LOCAL MODE'}</span>
-            {backendUp===false&&<button onClick={reconnect} style={{background:'transparent',border:`1px solid ${B.border}`,borderRadius:4,color:B.silver,fontSize:8,padding:'1px 6px',cursor:'pointer',fontFamily:"'DM Sans',sans-serif"}}>⟳ Connect</button>}
-          </div>
-          Astrion EDGE™ · v5.7{backendUp?' · Synced':' · Auto-saved'}<br/>{opps.length} opp{opps.length!==1?'s':''} · {pastPerfs.length} perfs · {proofPoints.length} proofs · {decisions.length} decisions
-        </div>
+        <div style={{fontSize:9,color:'#22224A',lineHeight:1.7}}>Astrion EDGE™ · v5.1 · Auto-saved<br/>{opps.length} opp{opps.length!==1?'s':''} · {pastPerfs.length} perfs · {proofPoints.length} proofs · {globalCompetitors.length} competitors</div>
       </div>
     </div>
 
@@ -4048,19 +2760,17 @@ function App(){
       </>}
 
       {/* Global library views */}
-      {['pastperfs','proofpoints','docgen','competitors','decisions','activity','settings'].map(gv=>view===gv&&!opp&&<div key={gv} style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',animation:'fadeIn .2s ease'}}>
+      {['pastperfs','proofpoints','docgen','competitors','blackhats'].map(gv=>view===gv&&!opp&&<div key={gv} style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',animation:'fadeIn .2s ease'}}>
         <div style={{background:B.cardBg,borderBottom:`1px solid ${B.border}`,padding:'12px 22px',flexShrink:0}}>
           <div style={{fontSize:15,fontWeight:700,color:'#F0F0FF'}}>
-            {gv==='pastperfs'?'🏆 Past Performance Library':gv==='proofpoints'?'💡 Proof Points Library':gv==='docgen'?'📄 Content Generator':gv==='competitors'?'⚔ Competitor Intelligence Library':gv==='decisions'?'📝 Decision Log':gv==='activity'?'📋 Activity Log':gv==='settings'?'⚙ Settings':'📋 View'}
+            {gv==='pastperfs'?'🏆 Past Performance Library':gv==='proofpoints'?'💡 Proof Points Library':gv==='docgen'?'📄 Document Generator':gv==='competitors'?'⚔ Competitor Intelligence Library':'🎯 Black Hat Session Center'}
           </div>
           <div style={{fontSize:10,color:B.silver,marginTop:2}}>
             {gv==='pastperfs'?`${pastPerfs.length} record${pastPerfs.length!==1?'s':''} · Track, manage, and generate proposal narratives`:
              gv==='proofpoints'?`${proofPoints.length} proof point${proofPoints.length!==1?'s':''} · Reusable across RFIs, proposals, white papers, capability statements, and more`:
-             gv==='docgen'?'Generate focused content blocks — capability paragraphs, discriminators, win themes, and more':
-             gv==='competitors'?`${globalCompetitors.length} competitor profile${globalCompetitors.length!==1?'s':''} · Intel accumulates across all opportunities`:
-             gv==='decisions'?`${decisions.length} decision${decisions.length!==1?'s':''} · Track rationale, outcomes, and leadership decisions across your portfolio`:
-             gv==='activity'?`Audit trail of all creates, updates, deletes, and syncs${backendUp?'':' · Requires backend'}`:
-             gv==='settings'?`Tag taxonomy · Auto-tag rules · ${ALL_TAGS.length} tags across ${Object.keys(TAG_TIERS).length} tiers`:''}
+             gv==='docgen'?'Generate proposal documents using proof points and past performances':
+             gv==='competitors'?`${globalCompetitors.length} competitor profile${globalCompetitors.length!==1?'s':''} · ${blackHatSessions.length} black hat session${blackHatSessions.length!==1?'s':''} · Intel accumulates across all opportunities`:
+             `${blackHatSessions.length} session${blackHatSessions.length!==1?'s':''} · Upload decks, record findings, sync intel to competitor profiles`}
           </div>
         </div>
         <div style={{flex:1,overflow:'hidden'}}>{GLOBAL_MODS[gv]}</div>
@@ -4069,14 +2779,7 @@ function App(){
       {view==='analytics'&&!opp&&<div style={{flex:1,overflow:'hidden',animation:'fadeIn .2s ease'}}>{GLOBAL_MODS.analytics}</div>}
       {view==='search'&&!opp&&<div style={{flex:1,overflow:'hidden',animation:'fadeIn .2s ease'}}>{GLOBAL_MODS.search}</div>}
     </div>
-
-    {/* ── TASK TRACKER SIDEBAR ── */}
-    <TaskTracker opps={opps} onOpenOpp={openOpp} onChange={updOpp}/>
   </div>;
 }
 
-const root=ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App/>);
-</script>
-</body>
-</html>
+export default App;

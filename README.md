@@ -1,19 +1,16 @@
-# Astrion EDGE™ Capture Tool
+# React + Vite
 
-Internal capture management tool built on Shipley methodology 
-and the Astrion Business Acquisition Process (BAP).
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-## Live Tool
-[Open Astrion EDGE™](https://gavintaylor3.github.io/capture-dashboard/AstrionCaptureTool_v5_7.html)
+Currently, two official plugins are available:
 
-## Architecture
-- **Frontend:** Single-file HTML (React/Babel, CDN imports, IndexedDB)
-- **Backend:** Node.js/Express + sql.js (optional, for team sync)
-- **AI:** Claude API via proxy for content generation
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-## Data Storage
-All capture data is stored locally in the user's browser (IndexedDB).
-No data is sent to any server in standalone mode.
+## React Compiler
 
-## Version
-v5.7 — Decision Log, Content Generator, Full BAP workflow (Stages 0–5, Gates A–D)
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+
+## Expanding the ESLint configuration
+
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.

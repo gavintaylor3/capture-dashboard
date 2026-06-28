@@ -1,0 +1,29 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{background:#0C0C18;font-family:'DM Sans',sans-serif;color:#E0E0F0;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:#0C0C18;}
+::-webkit-scrollbar-thumb{background:#252545;border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:#442C81;}
+input,select,textarea{font-family:'DM Sans',sans-serif;}
+.mono{font-family:'JetBrains Mono',monospace;}
+input[type=range]{accent-color:#442C81;width:100%;cursor:pointer;}
+input[type=checkbox]{accent-color:#FFAF2E;width:15px;height:15px;cursor:pointer;}
+select option{background:#14142A;color:#E8E8F0;}
+.drop-zone{border:2px dashed #252545;border-radius:10px;padding:22px;text-align:center;cursor:pointer;transition:all .15s;}
+.drop-zone:hover,.drop-zone.drag{border-color:#442C81;background:rgba(68,44,129,.07);}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastIn{from{opacity:0;transform:translateX(52px)}to{opacity:1;transform:translateX(0)}}
+@keyframes toastOut{from{opacity:1}to{opacity:0;transform:translateX(52px)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes dashFill{from{stroke-dashoffset:283}to{stroke-dashoffset:var(--target)}}
+@keyframes barGrow{from{width:0}to{width:var(--w)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.18);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;}
+.nav-btn{width:100%;display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:6px;border:none;cursor:pointer;margin-bottom:1px;text-align:left;font-size:11px;transition:all .12s;font-family:'DM Sans',sans-serif;}
+.nav-btn:hover{background:#14143A!important;}
+.card-hover{transition:all .15s;cursor:pointer;}
+.card-hover:hover{background:#1E1E38!important;transform:translateY(-1px);box-shadow:0 6px 24px rgba(0,0,0,.35)!important;}
