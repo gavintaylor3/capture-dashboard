@@ -8,6 +8,7 @@ import { STAGES, COMP_SIZES, CONTRACT_TYPES, CPARS, DOC_TYPES, PP_CATEGORIES,
          OPP_DOC_CATEGORIES, makeGates, blankOpp, ALL_TAGS } from "./config/methodology";
 import { callClaude } from "./lib/ai";
 import { PROMPTS } from "./config/prompts";
+import { KEYS, exportFilePrefix } from "./config/keys";
 // Make jsPDF available the same way the original code expects it
 window.jspdf = { jsPDF: jsPDFLib };
 
@@ -2479,12 +2480,12 @@ const OPP_NAV=[
 
 function App(){
   const load=key=>{try{return JSON.parse(localStorage.getItem(key)||'null');}catch{return null;}};
-  const [opps,setOpps]                         = useState(()=>load('astrion_opps')||[]);
-  const [pastPerfs,setPastPerfs]               = useState(()=>load('astrion_pastperfs')||[]);
-  const [proofPoints,setProofPoints]           = useState(()=>load('astrion_proofpoints')||[]);
-  const [fileStore,setFileStore]               = useState(()=>load('astrion_files')||{});
-  const [globalCompetitors,setGlobalCompetitors] = useState(()=>load('astrion_gcompetitors')||[]);
-  const [blackHatSessions,setBlackHatSessions] = useState(()=>load('astrion_blackhats')||[]);
+  const [opps,setOpps]                         = useState(()=>load(KEYS.opps)||[]);
+  const [pastPerfs,setPastPerfs]               = useState(()=>load(KEYS.pastperfs)||[]);
+  const [proofPoints,setProofPoints]           = useState(()=>load(KEYS.proofpoints)||[]);
+  const [fileStore,setFileStore]               = useState(()=>load(KEYS.files)||{});
+  const [globalCompetitors,setGlobalCompetitors] = useState(()=>load(KEYS.gcompetitors)||[]);
+  const [blackHatSessions,setBlackHatSessions] = useState(()=>load(KEYS.blackhats)||[]);
   const [view,setView]                         = useState('portfolio');
   const [activeOppId,setActiveOppId]           = useState(null);
   const [activeModule,setModule]               = useState('dashboard');
@@ -2492,12 +2493,12 @@ function App(){
   const [confirmDel,setConfirmDel]             = useState(null);
   const {show:toast,TC}                        = useToast();
 
-  useEffect(()=>{try{localStorage.setItem('astrion_opps',JSON.stringify(opps));}catch{}},[opps]);
-  useEffect(()=>{try{localStorage.setItem('astrion_pastperfs',JSON.stringify(pastPerfs));}catch{}},[pastPerfs]);
-  useEffect(()=>{try{localStorage.setItem('astrion_proofpoints',JSON.stringify(proofPoints));}catch{}},[proofPoints]);
-  useEffect(()=>{try{localStorage.setItem('astrion_files',JSON.stringify(fileStore));}catch{}},[fileStore]);
-  useEffect(()=>{try{localStorage.setItem('astrion_gcompetitors',JSON.stringify(globalCompetitors));}catch{}},[globalCompetitors]);
-  useEffect(()=>{try{localStorage.setItem('astrion_blackhats',JSON.stringify(blackHatSessions));}catch{}},[blackHatSessions]);
+  useEffect(()=>{try{localStorage.setItem(KEYS.opps,JSON.stringify(opps));}catch{}},[opps]);
+  useEffect(()=>{try{localStorage.setItem(KEYS.pastperfs,JSON.stringify(pastPerfs));}catch{}},[pastPerfs]);
+  useEffect(()=>{try{localStorage.setItem(KEYS.proofpoints,JSON.stringify(proofPoints));}catch{}},[proofPoints]);
+  useEffect(()=>{try{localStorage.setItem(KEYS.files,JSON.stringify(fileStore));}catch{}},[fileStore]);
+  useEffect(()=>{try{localStorage.setItem(KEYS.gcompetitors,JSON.stringify(globalCompetitors));}catch{}},[globalCompetitors]);
+  useEffect(()=>{try{localStorage.setItem(KEYS.blackhats,JSON.stringify(blackHatSessions));}catch{}},[blackHatSessions]);
 
   const addFiles=f=>{if(!f)return;setFileStore(s=>({...s,[f.id]:f}));};
   const removeFile=id=>setFileStore(s=>{const n={...s};delete n[id];return n;});
@@ -2511,7 +2512,7 @@ function App(){
     const data=JSON.stringify({opps,pastPerfs,proofPoints,globalCompetitors,blackHatSessions},null,2);
     const b=new Blob([data],{type:'application/json'});
     const url=URL.createObjectURL(b);
-    const a=document.createElement('a');a.href=url;a.download=`astrion-capture-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url);toast('Exported');
+    const a=document.createElement('a');a.href=url;a.download=`${exportFilePrefix}-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url);toast('Exported');
   };
   const importAll=data=>{if(data.opps)setOpps(data.opps);if(data.pastPerfs)setPastPerfs(data.pastPerfs);if(data.proofPoints)setProofPoints(data.proofPoints);if(data.globalCompetitors)setGlobalCompetitors(data.globalCompetitors);if(data.blackHatSessions)setBlackHatSessions(data.blackHatSessions);};
 
