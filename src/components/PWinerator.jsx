@@ -1,18 +1,5 @@
 import { useState, useMemo } from "react";
-
-// ── Brand tokens (mirrors EDGE™ palette) ──────────────────────────────────────
-const B = {
-  force:      "#442C81",
-  sky:        "#29AAE1",
-  refraction: "#1ED872",
-  supernova:  "#FFAF2E",
-  twilight:   "#FC5442",
-  silver:     "#9090B8",
-  darkBg:     "#0C0C18",
-  cardBg:     "#14142A",
-  sidebarBg:  "#0A0A16",
-  border:     "#252545",
-};
+import { B } from "../config/theme";
 
 // ── Shared style primitives ───────────────────────────────────────────────────
 const card = {
