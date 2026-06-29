@@ -6,6 +6,8 @@ import { stageColor, threatColor, priorityC, gateColor, influenceC, cparsColor, 
          fmtBytes, parseTCVNum, fmtTCVDisplay, fileIcon, fileIsImage } from "./lib/format";
 import { STAGES, COMP_SIZES, CONTRACT_TYPES, CPARS, DOC_TYPES, PP_CATEGORIES,
          OPP_DOC_CATEGORIES, makeGates, blankOpp, ALL_TAGS } from "./config/methodology";
+import { callClaude } from "./lib/ai";
+import { PROMPTS } from "./config/prompts";
 // Make jsPDF available the same way the original code expects it
 window.jspdf = { jsPDF: jsPDFLib };
 
@@ -37,13 +39,6 @@ function TCVInput({value,onChange,placeholder='e.g. $50M',style={}}){
 }
 
 
-async function callClaude(system,user){
-  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,system,messages:[{role:'user',content:user}]})});
-  const d=await r.json();
-  return d.content?.[0]?.text||'';
-}
 
 /* ── EXPORT UTILITIES ── */
 function exportToPDF(text,title,subtitle,footerNote){
@@ -1197,7 +1192,7 @@ function Solutioning({opp,onChange,proofPoints}){
   const gen=async id=>{
     setLoading(id);const item=items.find(x=>x.id===id);
     const linkedPPs=proofPoints.filter(p=>(item.proofPointIds||[]).includes(p.id));
-    try{const r=await callClaude('Senior capture manager at Astrion. Write Shipley-methodology discriminator statements. Active voice, specific, quantified.',
+    try{const r=await callClaude(PROMPTS.discriminators,
       `Opportunity: ${opp.name||'TBD'} (${opp.tcv||'TBD'}, ${opp.agency||'federal agency'})\nPain Point: ${item.painPoint}\nFeature: ${item.feature}\nBenefit: ${item.benefit}\nProof: ${item.proof}${linkedPPs.length?'\nProof Points:\n'+linkedPPs.map(p=>`- ${p.title}: ${p.metric}`).join('\n'):''}\n\nWrite a 2-3 sentence discriminator. Under 60 words. Lead with unique capability. Quantify.`);
       onChange({...opp,solutioning:items.map(x=>x.id===id?{...x,discriminator:r.trim(),aiGenerated:true}:x)});}catch(e){console.error(e);}
     setLoading(null);
@@ -1255,7 +1250,7 @@ function WinThemes({opp,onChange,proofPoints}){
   const gen=async id=>{
     setGenId(id);const t=ts.find(x=>x.id===id);
     const pps=proofPoints.filter(p=>(t.proofPointIds||[]).includes(p.id));
-    try{const r=await callClaude('Senior proposal writer at Astrion. Shipley methodology, active voice, mission-first.',
+    try{const r=await callClaude(PROMPTS.winThemes,
       `Win theme for ${opp.name||'this'} (${opp.tcv||'TBD'}, ${opp.agency||'federal agency'}).\nHot Button: ${t.hotButton}\nSection M: ${t.sectionM||'General'}\nFeature: ${t.feature}\nBenefit: ${t.benefit}\nProof: ${t.proof}${pps.length?'\nProof Points:\n'+pps.map(p=>`- ${p.title}: ${p.metric}`).join('\n'):''}\n\n4-5 sentences, under 120 words.`);
       onChange({...opp,winThemes:ts.map(t2=>t2.id===id?{...t2,narrative:r.trim(),aiGenerated:true}:t2)});}catch(e){console.error(e);}
     setGenId(null);
@@ -1319,7 +1314,7 @@ function GateBriefing({opp,pastPerfs,toast}){
   const gen=async()=>{
     setLoading(true);const gc=GC[sel];
     const linked=pastPerfs.filter(p=>(opp.linkedPastPerfIds||[]).includes(p.id));
-    try{const r=await callClaude('Senior capture manager at Astrion. Executive gate review. Shipley, concise bullets, active voice, specific data. Each section 3-4 bullets. No fluff.',
+    try{const r=await callClaude(PROMPTS.gateBriefing,
       `Gate: ${gc.label}\nOpp: ${opp.name||'TBD'} — ${opp.tcv||'TBD'}\nAgency: ${opp.agency||'TBD'}\nIncumbent: ${opp.incumbent||'TBD'}\nRFP: ${opp.rfpDate||'TBD'}\nP-Win: ${opp.pWinScore}%\nPartners: ${(opp.partners||[]).filter(p=>p.status==='Y').map(p=>p.name).join(', ')||'None'}\nCompetitors: ${(opp.competitors||[]).map(c=>c.name).join(', ')||'TBD'}\nActive Risks: ${(opp.risks||[]).filter(r=>r.status==='Active').map(r=>r.name).join('; ')||'None'}\nWin Themes: ${(opp.winThemes||[]).map(t=>t.hotButton).join('; ')||'TBD'}\nPast Performances: ${linked.map(p=>p.name+' ('+p.cparRating+')').join(', ')||'None linked'}\nAsk: ${ask||gc.defaultAsk}\n\nSections:\n${gc.sections.map((s,i)=>`${i+1}. ${s}`).join('\n')}\n\nUnder 400 words.`);
       setContent(p=>({...p,[sel]:r}));toast('Brief generated');}catch(e){toast('Failed','error');}
     setLoading(false);
@@ -1492,7 +1487,7 @@ function PastPerfLibrary({pastPerfs,setPastPerfs,proofPoints,fileStore,addFiles,
   const genNarrative=async id=>{
     const pp=pastPerfs.find(x=>x.id===id);if(!pp)return;
     setGenerating(true);
-    try{const r=await callClaude('Senior proposal writer at Astrion. Write compelling Shipley past performance narratives. Active voice, specific metrics, concrete outcomes.',
+    try{const r=await callClaude(PROMPTS.pastPerfNarrative,
       `Generate a past performance narrative for a federal proposal.\n\nContract: ${pp.name}\nAgency: ${pp.agency}\nValue: ${pp.value}\nRole: ${pp.role}\nPeriod: ${pp.periodStart} – ${pp.periodEnd}\nCPARS: ${pp.cparRating}\nDescription: ${pp.description}\nScope: ${pp.scope}\nKey Achievements: ${pp.keyAchievements}\nRelevance: ${pp.relevance}\n\n3-4 paragraphs: (1) contract overview, (2) Astrion contributions with metrics, (3) relevance to new requirement. Under 300 words.`);
       updPP(id,'generatedNarrative',r.trim());toast('Narrative generated');}catch(e){toast('Generation failed','error');}
     setGenerating(false);
@@ -1620,7 +1615,7 @@ function ProofPointLibrary({proofPoints,setProofPoints,pastPerfs,fileStore,addFi
   const enhance=async id=>{
     const pp=proofPoints.find(x=>x.id===id);if(!pp)return;
     setEnhancing(true);
-    try{const r=await callClaude('Senior capture manager at Astrion. Enhance proof points to be compelling, specific, quantified, proposal-ready.',
+    try{const r=await callClaude(PROMPTS.enhanceProofPoint,
       `Enhance this proof point:\nTitle: ${pp.title}\nMetric: ${pp.metric}\nContext: ${pp.context}\nCategory: ${pp.category}\n\nReturn JSON only: {"title":"...","metric":"...","narrative":"..."}`);
       try{const j=JSON.parse(r.replace(/```json|```/g,'').trim());upd(id,'enhanced',JSON.stringify(j));toast('Enhanced');}catch{upd(id,'enhanced',r);}
     }catch(e){toast('Enhancement failed','error');}
@@ -1733,7 +1728,7 @@ function DocumentGenerator({opps,pastPerfs,proofPoints,setProofPoints,toast}){
   const recordUsage=(ppIds,dt2,oppName)=>{const date=new Date().toISOString();setProofPoints(pps=>pps.map(pp=>ppIds.includes(pp.id)?{...pp,usageHistory:[...(pp.usageHistory||[]),{docType:dt2,oppName:oppName||'',date}]}:pp));};
   const generate=async()=>{
     setLoading(true);
-    const sys='Senior proposal writer at Astrion. Shipley methodology, active voice, mission-first, quantified claims. Astrion EDGE™.';
+    const sys=PROMPTS.docGenerator;
     const ppBlock=selPPObjs.length?`\nPROOF POINTS:\n${selPPObjs.map(p=>`- ${p.title}: ${p.metric}${p.context?' ('+p.context+')':''}`).join('\n')}`:'';;
     const perfBlock=selPerfObjs.length?`\nPAST PERFORMANCES:\n${selPerfObjs.map(p=>`- ${p.name} | ${p.agency} | ${p.value} | ${p.role} | ${p.cparRating||'N/A'} | ${p.keyAchievements||p.description||''}`).join('\n')}`:'';;
     const oppBlock=opp?`\nOPP: ${opp.name} | ${opp.agency||'TBD'} | ${opp.tcv||'TBD'} | ${opp.stage}`:'';
