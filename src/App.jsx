@@ -5,40 +5,16 @@ import { B, S, ta } from "./config/theme";
 import { stageColor, threatColor, priorityC, gateColor, influenceC, cparsColor, tagColor,
          fmtBytes, parseTCVNum, fmtTCVDisplay, fileIcon, fileIsImage } from "./lib/format";
 import { STAGES, COMP_SIZES, CONTRACT_TYPES, CPARS, DOC_TYPES, PP_CATEGORIES,
-         OPP_DOC_CATEGORIES, makeGates, blankOpp, ALL_TAGS } from "./config/methodology";
+         OPP_DOC_CATEGORIES, makeGates, blankOpp } from "./config/methodology";
 import { callClaude } from "./lib/ai";
 import { PROMPTS } from "./config/prompts";
 import { KEYS, exportFilePrefix } from "./config/keys";
+import { badge, TCVInput, TagEditor, useToast, ConfirmModal, FileList, PWinGauge,
+         HealthBar, Avatar, PWinSlider, ProofPointPicker, PastPerfPicker } from "./components/ui";
 // Make jsPDF available the same way the original code expects it
 window.jspdf = { jsPDF: jsPDFLib };
 
 /* ── HELPERS ── */
-const badge=(txt,color,sm)=>(
-  <span style={{background:color+'22',color,border:`1px solid ${color}44`,padding:sm?'1px 7px':'3px 9px',borderRadius:5,fontSize:sm?10:11,fontWeight:700,whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:3}}>{txt}</span>
-);
-
-function TCVInput({value,onChange,placeholder='e.g. $50M',style={}}){
-  const [editing,setEditing]=useState(false);
-  const [raw,setRaw]=useState(value||'');
-  useEffect(()=>{if(!editing)setRaw(value||'');},[value,editing]);
-  const commit=()=>{
-    setEditing(false);
-    const fmt=fmtTCVDisplay(raw);
-    onChange(fmt||raw);
-    setRaw(fmt||raw);
-  };
-  return <input
-    className="mono"
-    style={{...S.inp,...style,color:B.sky,fontWeight:700,fontSize:14}}
-    value={editing?raw:(fmtTCVDisplay(raw)||raw)}
-    placeholder={placeholder}
-    onFocus={()=>{setEditing(true);setRaw(value||'');}}
-    onChange={e=>setRaw(e.target.value)}
-    onBlur={commit}
-    onKeyDown={e=>e.key==='Enter'&&commit()}
-  />;
-}
-
 
 
 /* ── EXPORT UTILITIES ── */
@@ -77,231 +53,24 @@ function exportToDoc(text,title,subtitle){
 }
 
 
-function TagEditor({tags,onChange,compact}){
-  const [open,setOpen]=useState(false);
-  const cur=tags||[];
-  const toggle=t=>onChange(cur.includes(t)?cur.filter(x=>x!==t):[...cur,t]);
-  return <div>
-    <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center'}}>
-      {cur.map(t=><span key={t} onClick={()=>toggle(t)} style={{cursor:'pointer'}}>{badge(t,tagColor(t),true)} <span style={{fontSize:8,color:B.twilight}}>✕</span></span>)}
-      <button onClick={()=>setOpen(!open)} style={{...S.btn('transparent'),border:`1px dashed ${B.border}`,color:B.silver,fontSize:10,padding:'2px 8px'}}>{open?'Close':'+ Tag'}</button>
-    </div>
-    {open&&<div style={{display:'flex',gap:4,flexWrap:'wrap',marginTop:6,padding:8,background:'#181830',borderRadius:8,border:`1px solid ${B.border}`,animation:'fadeIn .12s ease'}}>
-      {ALL_TAGS.filter(t=>!cur.includes(t)).map(t=><span key={t} onClick={()=>toggle(t)} style={{cursor:'pointer'}}>{badge(t,tagColor(t),true)}</span>)}
-      {ALL_TAGS.filter(t=>!cur.includes(t)).length===0&&<span style={{fontSize:11,color:B.silver}}>All tags applied</span>}
-    </div>}
-  </div>;
-}
-
 /* ── TOAST ── */
-function Toast({message,type,onDone}){
-  const [vis,setVis]=useState(true);
-  useEffect(()=>{const t=setTimeout(()=>{setVis(false);setTimeout(onDone,280)},2800);return()=>clearTimeout(t)},[]);
-  const bg=type==='error'?B.twilight:type==='warn'?B.supernova:B.refraction;
-  return <div style={{background:B.cardBg,border:`1px solid ${bg}`,borderLeft:`4px solid ${bg}`,borderRadius:9,padding:'11px 16px',fontSize:12,fontWeight:600,boxShadow:'0 8px 32px rgba(0,0,0,.5)',animation:`${vis?'toastIn':'toastOut'} .28s ease forwards`,display:'flex',alignItems:'center',gap:10,maxWidth:340}}>
-    <span style={{color:bg}}>{type==='error'?'✕':type==='warn'?'⚠':'✓'}</span>{message}
-  </div>;
-}
-function useToast(){
-  const [toasts,setToasts]=useState([]);
-  const show=useCallback((msg,type='success')=>setToasts(t=>[...t,{id:Date.now()+Math.random(),msg,type}]),[]);
-  const rm=useCallback(id=>setToasts(t=>t.filter(x=>x.id!==id)),[]);
-  const TC=()=><div style={{position:'fixed',bottom:20,right:20,zIndex:9999,display:'flex',flexDirection:'column',gap:6}}>
-    {toasts.map(t=><Toast key={t.id} message={t.msg} type={t.type} onDone={()=>rm(t.id)}/>)}
-  </div>;
-  return{show,TC};
-}
 
 /* ── CONFIRM ── */
-function ConfirmModal({title='Confirm',message,onConfirm,onCancel,confirmLabel='Delete',confirmColor=B.twilight}){
-  useEffect(()=>{const h=e=>{if(e.key==='Escape')onCancel();if(e.key==='Enter')onConfirm();};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h)},[]);
-  return <div style={{position:'fixed',inset:0,background:'rgba(6,6,16,.9)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}} onClick={e=>e.target===e.currentTarget&&onCancel()}>
-    <div style={{background:B.cardBg,border:`1px solid ${confirmColor}44`,borderRadius:14,padding:'28px 32px',width:420,animation:'fadeIn .2s ease'}}>
-      <div style={{fontSize:16,fontWeight:700,color:'#F0F0FF',marginBottom:10}}>{title}</div>
-      <div style={{fontSize:13,color:B.silver,marginBottom:24,lineHeight:1.7}}>{message}</div>
-      <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
-        <button style={{...S.btn('transparent'),border:`1px solid ${B.border}`,color:B.silver}} onClick={onCancel}>Cancel</button>
-        <button style={S.btn(confirmColor)} onClick={onConfirm}>{confirmLabel}</button>
-      </div>
-    </div>
-  </div>;
-}
 
 /* ── FILE UPLOADER ── */
-function FileUploader({onUpload,compact,maxMB=10}){
-  const [drag,setDrag]=useState(false);
-  const ref=useRef();
-  const MAX=maxMB*1024*1024;
-  const ACCEPT='.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.png,.jpg,.jpeg,.gif,.webp,.svg';
-  const process=files=>Array.from(files).forEach(file=>{
-    if(file.size>MAX){onUpload(null,`${file.name} exceeds ${maxMB}MB limit`);return;}
-    const r=new FileReader();
-    r.onload=e=>onUpload({id:Date.now()+Math.random(),name:file.name,type:file.type,size:file.size,data:e.target.result,uploadedAt:new Date().toISOString(),category:'Other',notes:''});
-    r.readAsDataURL(file);
-  });
-  const onDrop=e=>{e.preventDefault();setDrag(false);process(e.dataTransfer.files);};
-  if(compact)return <button style={{...S.btn('transparent'),border:`1px dashed ${B.border}`,color:B.silver,fontSize:11,padding:'5px 12px'}} onClick={()=>ref.current.click()}>
-    <input ref={ref} type="file" multiple accept={ACCEPT} style={{display:'none'}} onChange={e=>process(e.target.files)}/>
-    📎 Attach
-  </button>;
-  return <div className={`drop-zone${drag?' drag':''}`} onDragOver={e=>{e.preventDefault();setDrag(true)}} onDragLeave={()=>setDrag(false)} onDrop={onDrop} onClick={()=>ref.current.click()}>
-    <input ref={ref} type="file" multiple accept={ACCEPT} style={{display:'none'}} onChange={e=>process(e.target.files)}/>
-    <div style={{fontSize:26,marginBottom:6}}>📎</div>
-    <div style={{fontSize:12,color:B.silver,fontWeight:500}}>Drop files or click to upload</div>
-    <div style={{fontSize:10,color:B.border,marginTop:4}}>PDF · DOCX · XLSX · PPTX · Images · TXT · CSV — max {maxMB}MB each</div>
-  </div>;
-}
 
-function FileList({fileIds,fileStore,onRemove,onAdd,compact}){
-  const files=(fileIds||[]).map(id=>fileStore[id]).filter(Boolean);
-  const [preview,setPreview]=useState(null);
-  const dl=f=>{const a=document.createElement('a');a.href=f.data;a.download=f.name;a.click();};
-  return <div>
-    {onAdd&&<FileUploader compact={compact} onUpload={(f)=>{if(f)onAdd(f);}}/>}
-    {files.length>0&&<div style={{marginTop:8,display:'flex',flexDirection:'column',gap:4}}>
-      {files.map(f=><div key={f.id} style={{display:'flex',alignItems:'center',gap:8,background:'#1A1A32',borderRadius:7,padding:'6px 10px',border:`1px solid ${B.border}`}}>
-        <span style={{fontSize:16}}>{fileIcon(f.type)}</span>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:11,fontWeight:600,color:'#E0E0F0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.name}</div>
-          <div style={{fontSize:10,color:B.silver}}>{fmtBytes(f.size)}</div>
-        </div>
-        {fileIsImage(f.type)&&<button onClick={()=>setPreview(f)} style={{...S.btn('transparent'),border:'none',color:B.sky,fontSize:10,padding:'2px 6px'}}>View</button>}
-        <button onClick={()=>dl(f)} style={{...S.btn('transparent'),border:'none',color:B.silver,fontSize:10,padding:'2px 6px'}}>↓</button>
-        {onRemove&&<button onClick={()=>onRemove(f.id)} style={{...S.btn('transparent'),border:'none',color:B.twilight,fontSize:10,padding:'2px 6px'}}>✕</button>}
-      </div>)}
-    </div>}
-    {preview&&<div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.9)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:2000}} onClick={()=>setPreview(null)}>
-      <img src={preview.data} alt={preview.name} style={{maxWidth:'90vw',maxHeight:'90vh',borderRadius:10,boxShadow:'0 24px 80px rgba(0,0,0,.9)'}}/>
-    </div>}
-  </div>;
-}
 
 /* ── P-WIN GAUGE (SVG circular) ── */
-function PWinGauge({value,size=130}){
-  const c=value>=60?B.refraction:value>=40?B.supernova:B.twilight;
-  const r=48,cx=65,cy=65;
-  const circ=2*Math.PI*r; // 301.6
-  const offset=circ-(circ*value/100);
-  return <div style={{position:'relative',width:size,height:size,flexShrink:0}}>
-    <svg width={size} height={size} viewBox="0 0 130 130" style={{transform:'rotate(-90deg)'}}>
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke={B.border} strokeWidth="10"/>
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke={c} strokeWidth="10"
-        strokeDasharray={circ} strokeDashoffset={offset}
-        strokeLinecap="round"
-        style={{transition:'stroke-dashoffset .8s cubic-bezier(.4,0,.2,1),stroke .4s ease',filter:`drop-shadow(0 0 6px ${c}88)`}}
-      />
-    </svg>
-    <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
-      <div className="mono" style={{fontSize:28,fontWeight:700,color:c,lineHeight:1}}>{value}%</div>
-      <div style={{fontSize:9,color:B.silver,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',marginTop:2}}>P-Win</div>
-    </div>
-  </div>;
-}
 
 /* ── HEALTH BAR ── */
-function HealthBar({label,value,max=5,color}){
-  const pct=Math.min((value/max)*100,100);
-  const c=color||(pct>=60?B.refraction:pct>=30?B.supernova:value===0?B.border:B.twilight);
-  return <div>
-    <div style={{display:'flex',justifyContent:'space-between',fontSize:10,marginBottom:4}}>
-      <span style={{color:B.silver,fontWeight:600}}>{label}</span>
-      <span className="mono" style={{color:c,fontWeight:700}}>{value}/{max}</span>
-    </div>
-    <div style={{height:4,background:B.border,borderRadius:2,overflow:'hidden'}}>
-      <div style={{height:'100%',width:`${pct}%`,background:c,borderRadius:2,transition:'width .6s ease',boxShadow:pct>0?`0 0 6px ${c}66`:''}}/>
-    </div>
-  </div>;
-}
 
 /* ── TEAM AVATAR ── */
-function Avatar({name,role,color}){
-  const initials=(name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  const c=color||B.force;
-  return <div style={{display:'flex',alignItems:'center',gap:8,padding:'5px 0'}}>
-    <div style={{width:30,height:30,borderRadius:'50%',background:c+'33',border:`2px solid ${c}66`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:c,flexShrink:0}}>{initials}</div>
-    <div style={{minWidth:0}}>
-      <div style={{fontSize:11,fontWeight:600,color:'#E0E0F0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{name||'—'}</div>
-      <div style={{fontSize:9,color:B.silver}}>{role}</div>
-    </div>
-  </div>;
-}
 
 /* ── PWIN SLIDER ── */
-function PWinSlider({value,onChange}){
-  const c=value>=60?B.refraction:value>=40?B.supernova:B.twilight;
-  return <div>
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:5}}>
-      <span style={S.lbl}>P-Win Score</span>
-      <span className="mono" style={{fontSize:22,fontWeight:700,color:c}}>{value}%</span>
-    </div>
-    <input type="range" min={0} max={100} value={value} onChange={e=>onChange(+e.target.value)}/>
-    <div style={{display:'flex',justifyContent:'space-between',fontSize:9,color:B.silver,marginTop:3}}>
-      <span style={{color:B.twilight}}>Low</span><span style={{color:B.supernova}}>Competitive</span><span style={{color:B.refraction}}>Favorable</span>
-    </div>
-  </div>;
-}
 
 /* ── PROOF POINT PICKER ── */
-function ProofPointPicker({proofPoints,selectedIds,onToggle,label='Link Proof Points'}){
-  const [open,setOpen]=useState(false);
-  const [q,setQ]=useState('');
-  const filtered=proofPoints.filter(p=>!q||(p.title+p.metric+p.category).toLowerCase().includes(q.toLowerCase()));
-  const sel=selectedIds||[];
-  return <div>
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-      <span style={S.lbl}>{label}</span>
-      <button onClick={()=>setOpen(!open)} style={{...S.btn(open?B.border:B.force),padding:'3px 10px',fontSize:11}}>{open?'Close':'+ Link'}</button>
-    </div>
-    {sel.length>0&&<div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:6}}>
-      {sel.map(id=>{const p=proofPoints.find(x=>x.id===id);return p?<span key={id} style={{cursor:'pointer'}} onClick={()=>onToggle(id)}>{badge(p.title.slice(0,28)+(p.title.length>28?'…':''),B.sky,true)} <span style={{fontSize:9,color:B.twilight}}>✕</span></span>:null;})}
-    </div>}
-    {open&&<div style={{background:'#181830',border:`1px solid ${B.border}`,borderRadius:9,padding:10,marginBottom:8,animation:'fadeIn .15s ease'}}>
-      <input style={{...S.inp,marginBottom:8,fontSize:11}} placeholder="Search proof points…" value={q} onChange={e=>setQ(e.target.value)}/>
-      <div style={{maxHeight:180,overflowY:'auto',display:'flex',flexDirection:'column',gap:3}}>
-        {filtered.length===0&&<div style={{color:B.silver,fontSize:12,textAlign:'center',padding:14}}>No proof points yet.</div>}
-        {filtered.map(p=>{const on=sel.includes(p.id);return <div key={p.id} onClick={()=>onToggle(p.id)} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',borderRadius:7,cursor:'pointer',background:on?B.force+'22':'transparent',border:`1px solid ${on?B.force:B.border}`,transition:'all .1s'}}>
-          <div style={{width:14,height:14,borderRadius:3,border:`2px solid ${on?B.force:B.border}`,background:on?B.force:'transparent',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:'#fff'}}>{on?'✓':''}</div>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:11,fontWeight:600,color:'#E0E0F0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.title}</div>
-            <div style={{fontSize:10,color:B.silver,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.metric}</div>
-          </div>
-          {badge(p.category,B.silver,true)}
-        </div>;})}
-      </div>
-    </div>}
-  </div>;
-}
 
 /* ── PAST PERF PICKER ── */
-function PastPerfPicker({pastPerfs,selectedIds,onToggle,label='Link Past Performances'}){
-  const [open,setOpen]=useState(false);
-  const [q,setQ]=useState('');
-  const filtered=pastPerfs.filter(p=>!q||(p.name+p.agency).toLowerCase().includes(q.toLowerCase()));
-  const sel=selectedIds||[];
-  return <div>
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-      <span style={S.lbl}>{label}</span>
-      <button onClick={()=>setOpen(!open)} style={{...S.btn(open?B.border:B.force),padding:'3px 10px',fontSize:11}}>{open?'Close':'+ Link'}</button>
-    </div>
-    {sel.length>0&&<div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:6}}>
-      {sel.map(id=>{const p=pastPerfs.find(x=>x.id===id);return p?<span key={id} style={{cursor:'pointer'}} onClick={()=>onToggle(id)}>{badge(p.name.slice(0,26)+(p.name.length>26?'…':''),'#B066FF',true)} <span style={{fontSize:9,color:B.twilight}}>✕</span></span>:null;})}
-    </div>}
-    {open&&<div style={{background:'#181830',border:`1px solid ${B.border}`,borderRadius:9,padding:10,marginBottom:8,animation:'fadeIn .15s ease'}}>
-      <input style={{...S.inp,marginBottom:8,fontSize:11}} placeholder="Search past performances…" value={q} onChange={e=>setQ(e.target.value)}/>
-      <div style={{maxHeight:180,overflowY:'auto',display:'flex',flexDirection:'column',gap:3}}>
-        {filtered.length===0&&<div style={{color:B.silver,fontSize:12,textAlign:'center',padding:14}}>No past performances yet.</div>}
-        {filtered.map(p=>{const on=sel.includes(p.id);return <div key={p.id} onClick={()=>onToggle(p.id)} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',borderRadius:7,cursor:'pointer',background:on?'#B066FF22':'transparent',border:`1px solid ${on?'#B066FF':B.border}`,transition:'all .1s'}}>
-          <div style={{width:14,height:14,borderRadius:3,border:`2px solid ${on?'#B066FF':B.border}`,background:on?'#B066FF':'transparent',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:'#fff'}}>{on?'✓':''}</div>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:11,fontWeight:600,color:'#E0E0F0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</div>
-            <div style={{fontSize:10,color:B.silver}}>{p.agency} · {p.value} · {p.role}</div>
-          </div>
-          {p.cparRating&&badge(p.cparRating,cparsColor(p.cparRating),true)}
-        </div>;})}
-      </div>
-    </div>}
-  </div>;
-}
 
 /* ═══════════════════ OPP DASHBOARD (redesigned) ═══════════════════ */
 function OppDashboard({opp,pastPerfs,onNav}){
@@ -581,35 +350,6 @@ function OppDocuments({opp,onChange,toast}){
 }
 
 /* ═══════════════════ COMPETITOR PICKER ═══════════════════ */
-function CompetitorPicker({globalCompetitors,selectedIds,onToggle,label='Link Competitors'}){
-  const [open,setOpen]=useState(false);
-  const [q,setQ]=useState('');
-  const filtered=globalCompetitors.filter(c=>!q||(c.name+c.agencies?.join('')).toLowerCase().includes(q.toLowerCase()));
-  const sel=selectedIds||[];
-  return <div>
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-      <span style={S.lbl}>{label}</span>
-      <button onClick={()=>setOpen(!open)} style={{...S.btn(open?B.border:B.twilight),padding:'3px 10px',fontSize:11}}>{open?'Close':'+ Link from Library'}</button>
-    </div>
-    {sel.length>0&&<div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:6}}>
-      {sel.map(id=>{const c=globalCompetitors.find(x=>x.id===id);return c?<span key={id} style={{cursor:'pointer'}} onClick={()=>onToggle(id)}>{badge(c.name.slice(0,26)+(c.name.length>26?'…':''),B.twilight,true)} <span style={{fontSize:9,color:B.twilight}}>✕</span></span>:null;})}
-    </div>}
-    {open&&<div style={{background:'#181830',border:`1px solid ${B.border}`,borderRadius:9,padding:10,marginBottom:8,animation:'fadeIn .15s ease'}}>
-      <input style={{...S.inp,marginBottom:8,fontSize:11}} placeholder="Search competitors…" value={q} onChange={e=>setQ(e.target.value)}/>
-      <div style={{maxHeight:180,overflowY:'auto',display:'flex',flexDirection:'column',gap:3}}>
-        {filtered.length===0&&<div style={{color:B.silver,fontSize:12,textAlign:'center',padding:14}}>No competitors in library yet. Add them in Competitor Intel.</div>}
-        {filtered.map(c=>{const on=sel.includes(c.id);return <div key={c.id} onClick={()=>onToggle(c.id)} style={{display:'flex',gap:8,alignItems:'center',padding:'7px 10px',borderRadius:7,cursor:'pointer',background:on?B.twilight+'22':'transparent',border:`1px solid ${on?B.twilight:B.border}`,transition:'all .1s'}}>
-          <div style={{width:14,height:14,borderRadius:3,border:`2px solid ${on?B.twilight:B.border}`,background:on?B.twilight:'transparent',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:'#fff'}}>{on?'✓':''}</div>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:11,fontWeight:600,color:'#E0E0F0',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</div>
-            <div style={{fontSize:10,color:B.silver}}>{c.size||'—'} · {c.agencies?.slice(0,2).join(', ')||'No agencies listed'}</div>
-          </div>
-          {c.recentWins>0&&badge(c.recentWins+' wins',B.refraction,true)}
-        </div>;})}
-      </div>
-    </div>}
-  </div>;
-}
 
 /* ═══════════════════ GLOBAL COMPETITOR LIBRARY ═══════════════════ */
 function CompetitorLibrary({globalCompetitors,setGlobalCompetitors,blackHatSessions,opps,fileStore,addFiles,removeFile,toast}){
