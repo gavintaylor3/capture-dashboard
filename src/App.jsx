@@ -10,6 +10,7 @@ import { callClaude } from "./lib/ai";
 import { PROMPTS } from "./config/prompts";
 import { KEYS, exportFilePrefix } from "./config/keys";
 import { exportToPDF, exportToDoc } from "./lib/export";
+import { OPP_NAV } from "./nav";
 import { badge, TCVInput, TagEditor, useToast, ConfirmModal, FileList, PWinGauge,
          HealthBar, Avatar, PWinSlider, ProofPointPicker, PastPerfPicker } from "./components/ui";
 // Make jsPDF available the same way the original code expects it
@@ -2168,22 +2169,6 @@ function PriceToWin({opp,onChange,globalCompetitors,toast}){
 }
 
 const GLOBAL_VIEWS=['portfolio','pastperfs','proofpoints','docgen','competitors','blackhats','analytics','search'];
-const OPP_NAV=[
-  {id:'dashboard',  label:'Dashboard',    icon:'◈'},
-  {id:'setup',      label:'Opportunity',  icon:'✎'},
-  {id:'pwinerator', label:'PWinerator 2.0',icon:'⚡'},
-  {id:'competitive',label:'Competitive',  icon:'⚔'},
-  {id:'customer',   label:'Customer Map', icon:'👥'},
-  {id:'teaming',    label:'Teaming',      icon:'🤝'},
-  {id:'solutioning',label:'Solutioning',  icon:'⚙'},
-  {id:'winthemes',  label:'Win Themes',   icon:'★'},
-  {id:'ptw',        label:'Price to Win', icon:'$'},
-  {id:'briefing',   label:'Gate Briefing',icon:'📋'},
-  {id:'pastperf',   label:'Past Perf',    icon:'🏆'},
-  {id:'documents',  label:'Documents',    icon:'📁'},
-  {id:'risks',      label:'Risks',        icon:'⚠'},
-  {id:'actions',    label:'Actions',      icon:'✓'},
-];
 
 function App(){
   const load=key=>{try{return JSON.parse(localStorage.getItem(key)||'null');}catch{return null;}};
