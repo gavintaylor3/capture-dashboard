@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { jsPDF as jsPDFLib } from "jspdf";
-
+import PWinerator from "./components/PWinerator"; 
 // Make jsPDF available the same way the original code expects it
 window.jspdf = { jsPDF: jsPDFLib };
 
@@ -2563,6 +2563,7 @@ const GLOBAL_VIEWS=['portfolio','pastperfs','proofpoints','docgen','competitors'
 const OPP_NAV=[
   {id:'dashboard',  label:'Dashboard',    icon:'◈'},
   {id:'setup',      label:'Opportunity',  icon:'✎'},
+  {id:'pwinerator', label:'PWinerator 2.0',icon:'⚡'},
   {id:'competitive',label:'Competitive',  icon:'⚔'},
   {id:'customer',   label:'Customer Map', icon:'👥'},
   {id:'teaming',    label:'Teaming',      icon:'🤝'},
@@ -2624,6 +2625,7 @@ function App(){
   const OPP_MODS=opp?{
     dashboard:   <OppDashboard opp={opp} pastPerfs={pastPerfs} onNav={navTo}/>,
     setup:       <OppSetup opp={opp} onChange={updOpp}/>,
+    pwinerator:  <PWinerator opp={opp} onSave={updOpp}/>,
     competitive: <CompetitiveIntel opp={opp} onChange={updOpp} globalCompetitors={globalCompetitors} blackHatSessions={blackHatSessions} toast={toast}/>,
     customer:    <CustomerMap opp={opp} onChange={updOpp}/>,
     teaming:     <Teaming opp={opp} onChange={updOpp}/>,
