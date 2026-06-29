@@ -1,16 +1,43 @@
-# React + Vite
+# Capture Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A single-page capture-management tool for federal business development: track
+opportunities through a gated capture lifecycle, manage past performances and
+reusable proof points, run competitive intel and Black Hat sessions, price-to-win,
+and generate proposal documents.
 
-Currently, two official plugins are available:
+Built with **React 18 + Vite**. Persistence today is browser `localStorage`; a
+migration to a Supabase backend (Postgres + Auth + RLS + Storage) is planned — see
+[`MIGRATION.md`](./MIGRATION.md).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Getting started
 
-## React Compiler
+```bash
+npm install
+npm run dev      # start the Vite dev server
+npm run build    # production build to dist/
+npm run preview  # preview the production build
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The app entry point is `src/main.jsx → src/App.jsx`.
 
-## Expanding the ESLint configuration
+## Project layout
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```
+index.html               # Vite HTML entry (loads /src/main.jsx)
+src/
+  main.jsx               # React root
+  App.jsx                # application shell + all feature modules (being split — see MIGRATION.md §2)
+  index.css              # global styles
+  components/
+    PWinerator.jsx       # P-Win calculator module
+  assets/                # images
+public/                  # static assets (favicon, icons)
+supabase/
+  migrations/            # database schema for the planned Supabase backend (MIGRATION.md §3)
+```
+
+## Roadmap
+
+See [`MIGRATION.md`](./MIGRATION.md) for the planned work: de-branding into a config
+layer, splitting `App.jsx` into per-module files, and adding the Supabase data layer.
+Work is sequenced as a series of PRs (PR 0 = repo cleanup).
